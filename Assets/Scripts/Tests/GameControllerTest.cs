@@ -13,7 +13,7 @@ using ShadowCardSmash.Network;
 public class GameControllerTest : MonoBehaviour
 {
     private GameController _gameController;
-    private TestCardDatabase _cardDatabase;
+    private SimpleTestCardDatabase _cardDatabase;
 
     void Start()
     {
@@ -51,7 +51,7 @@ public class GameControllerTest : MonoBehaviour
         _gameController = go.AddComponent<GameController>();
 
         // 创建测试卡牌数据库
-        _cardDatabase = new TestCardDatabase();
+        _cardDatabase = new SimpleTestCardDatabase();
 
         // 订阅事件
         _gameController.OnGameStarted += () => Debug.Log("事件: 游戏开始");
@@ -322,11 +322,11 @@ public class GameControllerTest : MonoBehaviour
 /// <summary>
 /// 测试用卡牌数据库
 /// </summary>
-public class TestCardDatabase : ICardDatabase
+public class SimpleTestCardDatabase : ICardDatabase
 {
     private Dictionary<int, CardData> _cards;
 
-    public TestCardDatabase()
+    public SimpleTestCardDatabase()
     {
         _cards = new Dictionary<int, CardData>();
         InitializeTestCards();
@@ -394,7 +394,7 @@ public class TestCardDatabase : ICardDatabase
             value = 1
         });
 
-        Debug.Log($"TestCardDatabase: 初始化了 {_cards.Count} 张测试卡牌");
+        Debug.Log($"SimpleTestCardDatabase: 初始化了 {_cards.Count} 张测试卡牌");
     }
 
     public CardData GetCardById(int cardId)
@@ -404,7 +404,7 @@ public class TestCardDatabase : ICardDatabase
             return card;
         }
 
-        Debug.LogWarning($"TestCardDatabase: 找不到卡牌ID {cardId}");
+        Debug.LogWarning($"SimpleTestCardDatabase: 找不到卡牌ID {cardId}");
         // 返回一个默认卡牌 (id, name, cost, attack, health)
         return CardData.CreateMinion(cardId, $"未知卡牌{cardId}", 1, 1, 1);
     }
