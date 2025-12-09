@@ -29,9 +29,15 @@ namespace ShadowCardSmash.UI.Battle
         public float drawAnimationDuration = 0.3f;
         public float rearrangeAnimationDuration = 0.2f;
 
+        [Header("Attack Target Overlay")]
+        public Image attackTargetOverlay;
+        public Button attackTargetButton;  // 用于接收点击的Button
+        public Color attackTargetColor = new Color(1f, 0f, 0f, 0.3f);
+
         // 手牌列表
         private List<CardViewController> _handCards = new List<CardViewController>();
         private List<GameObject> _handCardObjects = new List<GameObject>(); // 用于跟踪所有卡牌对象（包括卡背）
+        private Dictionary<CardViewController, Vector2> _cardOriginalPositions = new Dictionary<CardViewController, Vector2>(); // 保存卡牌原始位置
         private CardViewController _hoveredCard;
         private CardViewController _selectedCard;
         private int _selectedHandIndex = -1;
@@ -39,16 +45,30 @@ namespace ShadowCardSmash.UI.Battle
         // 卡牌数据库引用
         private ICardDatabase _cardDatabase;
 
+        // 内部状态
+        private bool _isValidAttackTarget;
+
         // 事件
         public event Action<int> OnCardClicked;      // 参数：手牌索引
         public event Action<int> OnCardHovered;
         public event Action OnCardUnhovered;
         public event Action<int> OnCardRightClicked; // 显示详情
+        public event Action OnAreaClicked;           // 手牌区域被点击（用于攻击玩家）
 
         // 属性
         public int CardCount => _handCards.Count;
+        public bool IsValidAttackTarget => _isValidAttackTarget;
         public CardViewController SelectedCard => _selectedCard;
         public int SelectedHandIndex => _selectedHandIndex;
+
+        void Awake()
+        {
+            // 绑定攻击目标按钮点击事件
+            if (attackTargetButton != null)
+            {
+                attackTargetButton.onClick.AddListener(OnHandAreaClicked);
+            }
+        }
 
         /// <summary>
         /// 设置卡牌数据库引用
@@ -356,6 +376,7 @@ namespace ShadowCardSmash.UI.Battle
                 }
             }
             _handCardObjects.Clear();
+            _cardOriginalPositions.Clear();
 
             _selectedCard = null;
             _selectedHandIndex = -1;
@@ -385,8 +406,14 @@ namespace ShadowCardSmash.UI.Battle
             var rectTransform = cardView.GetComponent<RectTransform>();
             if (rectTransform != null)
             {
+                // 保存原始位置（如果还没保存）
+                if (!_cardOriginalPositions.ContainsKey(cardView))
+                {
+                    _cardOriginalPositions[cardView] = rectTransform.anchoredPosition;
+                }
+
                 var pos = rectTransform.anchoredPosition;
-                pos.y = hoverRaiseAmount;
+                pos.y = _cardOriginalPositions[cardView].y + hoverRaiseAmount;
                 rectTransform.anchoredPosition = pos;
             }
 
@@ -400,13 +427,11 @@ namespace ShadowCardSmash.UI.Battle
                 _hoveredCard = null;
             }
 
-            // 放下卡牌
+            // 恢复到原始位置
             var rectTransform = cardView.GetComponent<RectTransform>();
-            if (rectTransform != null)
+            if (rectTransform != null && _cardOriginalPositions.TryGetValue(cardView, out var originalPos))
             {
-                var pos = rectTransform.anchoredPosition;
-                pos.y = 0;
-                rectTransform.anchoredPosition = pos;
+                rectTransform.anchoredPosition = originalPos;
             }
 
             OnCardUnhovered?.Invoke();
@@ -415,6 +440,44 @@ namespace ShadowCardSmash.UI.Battle
         private void HandleCardRightClicked(CardViewController cardView)
         {
             OnCardRightClicked?.Invoke(cardView.HandIndex);
+        }
+
+        #endregion
+
+        #region Attack Target
+
+        /// <summary>
+        /// 设置为有效攻击目标（用于攻击玩家）
+        /// </summary>
+        public void SetValidAttackTarget(bool valid)
+        {
+            _isValidAttackTarget = valid;
+
+            if (attackTargetOverlay != null)
+            {
+                var color = attackTargetColor;
+                color.a = valid ? attackTargetColor.a : 0f;
+                attackTargetOverlay.color = color;
+            }
+        }
+
+        /// <summary>
+        /// 清除攻击目标高亮
+        /// </summary>
+        public void ClearAttackTargetHighlight()
+        {
+            SetValidAttackTarget(false);
+        }
+
+        /// <summary>
+        /// 处理手牌区域点击（由外部Button调用）
+        /// </summary>
+        public void OnHandAreaClicked()
+        {
+            if (_isValidAttackTarget)
+            {
+                OnAreaClicked?.Invoke();
+            }
         }
 
         #endregion

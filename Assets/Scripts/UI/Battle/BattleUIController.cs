@@ -102,7 +102,25 @@ namespace ShadowCardSmash.UI.Battle
             // 绑定牌库/墓地事件
             BindDeckGraveyardEvents();
 
+            // 绑定对手手牌区点击事件（用于攻击玩家）
+            if (opponentHandArea != null)
+            {
+                opponentHandArea.OnAreaClicked += OnOpponentHandAreaClicked;
+            }
+
             // 注意：游戏控制器事件订阅在 Initialize() 中完成，不在这里重复订阅
+        }
+
+        void Update()
+        {
+            // ESC 或右键取消当前选择状态
+            if (Input.GetKeyDown(KeyCode.Escape) || Input.GetMouseButtonDown(1))
+            {
+                if (_currentState != BattleUIState.Idle && _currentState != BattleUIState.WaitingForOpponent)
+                {
+                    CancelCurrentAction();
+                }
+            }
         }
 
         void OnDestroy()
@@ -428,7 +446,10 @@ namespace ShadowCardSmash.UI.Battle
         private void RefreshButtons()
         {
             bool isMyTurn = gameController?.IsMyTurn ?? false;
-            bool canEndTurn = isMyTurn && _currentState == BattleUIState.Idle;
+            // 只要是我的回合，就可以结束回合（不受 UI 状态影响）
+            bool canEndTurn = isMyTurn && _currentState != BattleUIState.WaitingForOpponent;
+
+            Debug.Log($"RefreshButtons: isMyTurn={isMyTurn}, state={_currentState}, canEndTurn={canEndTurn}");
 
             if (endTurnButton != null)
             {
@@ -465,22 +486,25 @@ namespace ShadowCardSmash.UI.Battle
         /// </summary>
         public void OnTurnStart(int playerId)
         {
-            Debug.Log($"BattleUIController: 回合开始 - 玩家{playerId}");
-
-            SetState(BattleUIState.Idle);
-            // 注意：不在这里调用 RefreshAllUI()，OnStateChanged 事件会触发刷新
+            Debug.Log($"BattleUIController: 回合开始 - 玩家{playerId}, localPlayerId={_localPlayerId}");
 
             if (playerId == _localPlayerId)
             {
                 // 我的回合
+                SetState(BattleUIState.Idle);
                 ShowMessage("你的回合");
+                HighlightPlayableCards();
             }
             else
             {
                 // 对手回合
-                ShowMessage("对手回合");
                 SetState(BattleUIState.WaitingForOpponent);
+                ShowMessage("对手回合");
+                ClearAllHighlights();
             }
+
+            // 确保按钮状态正确更新
+            RefreshButtons();
         }
 
         private void OnTurnChanged(int playerId)
@@ -562,7 +586,13 @@ namespace ShadowCardSmash.UI.Battle
 
         private void OnTileClicked(TileSlotController tile)
         {
-            if (!gameController.IsMyTurn) return;
+            Debug.Log($"BattleUIController: 点击格子 - index={tile.tileIndex}, isOpponent={tile.isOpponentTile}, isEmpty={tile.IsEmpty}, state={_currentState}");
+
+            if (!gameController.IsMyTurn)
+            {
+                Debug.Log("BattleUIController: 不是我的回合，忽略点击");
+                return;
+            }
 
             switch (_currentState)
             {
@@ -570,6 +600,7 @@ namespace ShadowCardSmash.UI.Battle
                     // 点击我方有单位的格子，准备攻击
                     if (!tile.isOpponentTile && !tile.IsEmpty)
                     {
+                        Debug.Log($"BattleUIController: Idle状态，点击我方有单位的格子{tile.tileIndex}，尝试选择攻击者");
                         SelectAttacker(tile);
                     }
                     break;
@@ -614,6 +645,18 @@ namespace ShadowCardSmash.UI.Battle
                         ExecuteCardWithTarget(tile);
                     }
                     break;
+
+                case BattleUIState.SelectingEvolutionTarget:
+                    // 选择进化目标
+                    if (!tile.isOpponentTile && tile.IsValidTarget && !tile.IsEmpty)
+                    {
+                        ExecuteEvolution(tile);
+                    }
+                    else
+                    {
+                        CancelCurrentAction();
+                    }
+                    break;
             }
         }
 
@@ -623,6 +666,19 @@ namespace ShadowCardSmash.UI.Battle
 
             CancelCurrentAction();
             gameController.TryEndTurn();
+        }
+
+        private void OnOpponentHandAreaClicked()
+        {
+            if (!gameController.IsMyTurn) return;
+
+            // 只有在选择攻击目标状态下，且对手是有效目标时才能攻击
+            if (_currentState == BattleUIState.SelectingAttackTarget &&
+                opponentHandArea != null &&
+                opponentHandArea.IsValidAttackTarget)
+            {
+                ExecuteAttackOnPlayer();
+            }
         }
 
         private void OnEvolveClicked()
@@ -635,7 +691,12 @@ namespace ShadowCardSmash.UI.Battle
             {
                 // 高亮可进化的随从
                 HighlightEvolvableMinions(evolvableMinions);
-                SetState(BattleUIState.SelectingTarget);
+                SetState(BattleUIState.SelectingEvolutionTarget);
+                Debug.Log($"BattleUIController: 进入进化选择模式，可进化随从数: {evolvableMinions.Count}");
+            }
+            else
+            {
+                Debug.Log("BattleUIController: 没有可进化的随从");
             }
         }
 
@@ -723,11 +784,22 @@ namespace ShadowCardSmash.UI.Battle
         private void SelectAttacker(TileSlotController tile)
         {
             var occupant = tile.GetOccupant();
-            if (occupant?.RuntimeCard == null) return;
+            if (occupant == null)
+            {
+                Debug.Log($"BattleUIController: 格子{tile.tileIndex}没有占据者(occupant为null)");
+                return;
+            }
+            if (occupant.RuntimeCard == null)
+            {
+                Debug.Log($"BattleUIController: 格子{tile.tileIndex}的占据者没有RuntimeCard");
+                return;
+            }
+
+            Debug.Log($"BattleUIController: 尝试选择攻击者 - 格子{tile.tileIndex}, 单位ID={occupant.RuntimeCard.instanceId}, canAttack={occupant.RuntimeCard.canAttack}");
 
             if (!occupant.RuntimeCard.canAttack)
             {
-                Debug.Log("BattleUIController: 该单位无法攻击");
+                Debug.Log("BattleUIController: 该单位无法攻击（可能是召唤病或已攻击过）");
                 return;
             }
 
@@ -771,6 +843,46 @@ namespace ShadowCardSmash.UI.Battle
             CancelCurrentAction();
         }
 
+        private void ExecuteAttackOnPlayer()
+        {
+            if (_selectedAttackerInstanceId < 0) return;
+
+            int opponentId = 1 - _localPlayerId;
+            bool success = gameController.TryAttack(_selectedAttackerInstanceId, -1, true, opponentId);
+
+            if (success)
+            {
+                Debug.Log($"BattleUIController: 执行攻击玩家 {_selectedAttackerInstanceId} -> 玩家{opponentId}");
+            }
+
+            CancelCurrentAction();
+        }
+
+        private void ExecuteEvolution(TileSlotController tile)
+        {
+            var occupant = tile.GetOccupant();
+            if (occupant?.RuntimeCard == null)
+            {
+                Debug.LogWarning("BattleUIController: 进化目标格子没有单位");
+                CancelCurrentAction();
+                return;
+            }
+
+            int instanceId = occupant.RuntimeCard.instanceId;
+            bool success = gameController.TryEvolve(instanceId);
+
+            if (success)
+            {
+                Debug.Log($"BattleUIController: 进化成功 - 单位 {instanceId}");
+            }
+            else
+            {
+                Debug.LogWarning($"BattleUIController: 进化失败 - 单位 {instanceId}");
+            }
+
+            CancelCurrentAction();
+        }
+
         #endregion
 
         #region Highlighting
@@ -804,9 +916,17 @@ namespace ShadowCardSmash.UI.Battle
             {
                 _validTargetInstanceIds.Add(target.instanceId);
 
-                // 在对手战场找到对应的格子
-                if (!target.isPlayer && opponentTiles != null)
+                if (target.isPlayer)
                 {
+                    // 高亮对手手牌区
+                    if (opponentHandArea != null)
+                    {
+                        opponentHandArea.SetValidAttackTarget(true);
+                    }
+                }
+                else if (opponentTiles != null)
+                {
+                    // 在对手战场找到对应的格子
                     foreach (var tile in opponentTiles)
                     {
                         var occupant = tile.GetOccupant();
@@ -857,6 +977,9 @@ namespace ShadowCardSmash.UI.Battle
                     tile?.ClearHighlights();
                 }
             }
+
+            // 清除对手手牌区攻击目标高亮
+            opponentHandArea?.ClearAttackTargetHighlight();
 
             _validTileIndices.Clear();
             _validTargetInstanceIds.Clear();
@@ -1083,6 +1206,7 @@ namespace ShadowCardSmash.UI.Battle
         SelectingTarget,        // 选择效果目标
         SelectingAttacker,      // 选择攻击者
         SelectingAttackTarget,  // 选择攻击目标
+        SelectingEvolutionTarget, // 选择进化目标
         WaitingForOpponent,     // 等待对手
         Animating               // 播放动画中
     }

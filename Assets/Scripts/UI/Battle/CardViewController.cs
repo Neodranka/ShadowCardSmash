@@ -289,6 +289,17 @@ namespace ShadowCardSmash.UI.Battle
 
         public void OnPointerClick(PointerEventData eventData)
         {
+            // 检查是否在战场格子上（父级或祖父级有TileSlotController）
+            var parentTile = GetComponentInParent<TileSlotController>();
+            if (parentTile != null)
+            {
+                // 在战场上，将点击事件传递给格子
+                // 使用ExecuteEvents将点击传递给格子
+                ExecuteEvents.Execute(parentTile.gameObject, eventData, ExecuteEvents.pointerClickHandler);
+                return;
+            }
+
+            // 在手牌中，正常处理点击
             if (eventData.button == PointerEventData.InputButton.Left)
             {
                 OnCardClicked?.Invoke(this);

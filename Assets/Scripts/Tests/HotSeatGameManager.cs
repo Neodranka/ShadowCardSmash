@@ -260,6 +260,8 @@ namespace ShadowCardSmash.Tests
             if (battleUI != null)
             {
                 battleUI.Initialize(_cardDatabase, _currentViewingPlayer);
+                // 重要：设置正确的回合状态，这样按钮和手牌才能正常使用
+                battleUI.SetMyTurn(gameController.IsMyTurn);
                 battleUI.RefreshAllUI();
             }
         }

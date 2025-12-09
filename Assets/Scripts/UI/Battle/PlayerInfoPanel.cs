@@ -33,8 +33,13 @@ namespace ShadowCardSmash.UI.Battle
         public GameObject floatingTextPrefab;
         public Transform floatingTextSpawnPoint;
 
+        [Header("Attack Target Highlight")]
+        public GameObject attackTargetHighlight;
+        public Color attackTargetColor = new Color(1f, 0.3f, 0.3f, 0.8f);
+
         // 内部状态
         private List<Image> _epIcons = new List<Image>();
+        private bool _isValidAttackTarget;
         private int _currentHealth;
         private int _maxHealth;
         private int _currentMana;
@@ -43,6 +48,9 @@ namespace ShadowCardSmash.UI.Battle
 
         // 事件
         public event Action OnPortraitClicked;
+
+        // 属性
+        public bool IsValidAttackTarget => _isValidAttackTarget;
 
         void Start()
         {
@@ -203,6 +211,33 @@ namespace ShadowCardSmash.UI.Battle
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// 设置为有效攻击目标
+        /// </summary>
+        public void SetValidAttackTarget(bool valid)
+        {
+            _isValidAttackTarget = valid;
+
+            if (attackTargetHighlight != null)
+            {
+                attackTargetHighlight.SetActive(valid);
+            }
+
+            // 给头像添加颜色效果
+            if (portrait != null)
+            {
+                portrait.color = valid ? attackTargetColor : Color.white;
+            }
+        }
+
+        /// <summary>
+        /// 清除高亮
+        /// </summary>
+        public void ClearHighlight()
+        {
+            SetValidAttackTarget(false);
         }
 
         /// <summary>

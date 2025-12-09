@@ -157,20 +157,31 @@ namespace ShadowCardSmash.Core.Rules
         {
             var result = new List<RuntimeCard>();
 
+            var player = state.GetPlayer(playerId);
+            int requiredTurn = (playerId == 0) ? 5 : EVOLUTION_AVAILABLE_TURN;
+
+            UnityEngine.Debug.Log($"EvolutionSystem.GetEvolvableMinions: playerId={playerId}, turnNumber={state.turnNumber}, requiredTurn={requiredTurn}, EP={player.evolutionPoints}, hasEvolvedThisTurn={player.hasEvolvedThisTurn}");
+
             if (!CanUseEvolution(state, playerId))
             {
+                UnityEngine.Debug.Log($"EvolutionSystem: CanUseEvolution返回false");
                 return result;
             }
 
-            var player = state.GetPlayer(playerId);
             foreach (var tile in player.field)
             {
-                if (tile.occupant != null && CanEvolveMinion(state, tile.occupant, playerId))
+                if (tile.occupant != null)
                 {
-                    result.Add(tile.occupant);
+                    bool canEvolve = CanEvolveMinion(state, tile.occupant, playerId);
+                    UnityEngine.Debug.Log($"EvolutionSystem: 检查随从 {tile.occupant.instanceId}, isEvolved={tile.occupant.isEvolved}, canEvolve={canEvolve}");
+                    if (canEvolve)
+                    {
+                        result.Add(tile.occupant);
+                    }
                 }
             }
 
+            UnityEngine.Debug.Log($"EvolutionSystem: 可进化随从数={result.Count}");
             return result;
         }
     }
