@@ -1,7 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(xargs:*)",
+      "Bash(find:*)",
+      "Bash(cat:*)",
+      "Bash(while read f)",
+      "Bash(do grep -q \"guid: dfe8028d6a5755b47aff6592b0f9509c\" \"$f\")",
+      "Bash(echo:*)",
+      "Bash(done)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

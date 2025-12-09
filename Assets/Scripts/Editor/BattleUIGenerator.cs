@@ -40,9 +40,11 @@ namespace ShadowCardSmash.Editor
         // 路径常量
         private const string PREFAB_PATH = "Assets/Prefabs/UI";
         private const string SCENE_PATH = "Assets/Scenes";
+        private const string CHINESE_FONT_PATH = "Assets/Resources/Fonts/ChineseFont SDF.asset";
 
         // 生成的引用
         private static GameObject _canvas;
+        private static TMP_FontAsset _chineseFont;
         private static BattleUIController _battleUIController;
         private static HotSeatGameManager _hotSeatManager;
 
@@ -59,6 +61,9 @@ namespace ShadowCardSmash.Editor
             try
             {
                 EditorUtility.DisplayProgressBar("生成战斗UI", "准备中...", 0f);
+
+                // 加载中文字体
+                LoadChineseFont();
 
                 // 确保目录存在
                 EnsureDirectoriesExist();
@@ -91,6 +96,73 @@ namespace ShadowCardSmash.Editor
                 EditorUtility.ClearProgressBar();
                 EditorUtility.DisplayDialog("错误", $"生成UI时发生错误：\n{e.Message}", "确定");
                 Debug.LogError($"BattleUIGenerator Error: {e}");
+            }
+        }
+
+        private static void LoadChineseFont()
+        {
+            // 首先尝试使用 TMP 内置的 LiberationSans（最稳定）
+            var liberationSans = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset");
+            if (liberationSans != null && IsFontAssetValid(liberationSans))
+            {
+                _chineseFont = liberationSans;
+                Debug.Log($"[BattleUIGenerator] 使用内置字体: {_chineseFont.name}");
+                return;
+            }
+
+            // 尝试加载中文字体
+            _chineseFont = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(CHINESE_FONT_PATH);
+
+            // 检查字体是否损坏（atlas texture 是否有效）
+            if (_chineseFont != null && !IsFontAssetValid(_chineseFont))
+            {
+                Debug.LogWarning("[BattleUIGenerator] ChineseFont SDF 已损坏，使用备用字体");
+                _chineseFont = null;
+            }
+
+            if (_chineseFont == null)
+            {
+                // 尝试从其他位置加载有效的字体
+                string[] fontGuids = AssetDatabase.FindAssets("t:TMP_FontAsset");
+                foreach (var guid in fontGuids)
+                {
+                    string fontPath = AssetDatabase.GUIDToAssetPath(guid);
+                    var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(fontPath);
+                    if (font != null && IsFontAssetValid(font))
+                    {
+                        _chineseFont = font;
+                        Debug.Log($"[BattleUIGenerator] 找到有效字体: {font.name}");
+                        break;
+                    }
+                }
+            }
+
+            if (_chineseFont != null)
+            {
+                Debug.Log($"[BattleUIGenerator] 已加载字体: {_chineseFont.name}");
+            }
+            else
+            {
+                Debug.LogError("[BattleUIGenerator] 无法加载任何有效字体！请确保 TextMesh Pro 已正确导入。");
+            }
+        }
+
+        private static bool IsFontAssetValid(TMP_FontAsset fontAsset)
+        {
+            if (fontAsset == null) return false;
+
+            try
+            {
+                // 检查 atlas texture 是否有效
+                if (fontAsset.atlasTexture == null) return false;
+
+                // 尝试访问纹理属性，如果损坏会抛出异常
+                var width = fontAsset.atlasTexture.width;
+                return width > 0;
+            }
+            catch
+            {
+                return false;
             }
         }
 
@@ -291,6 +363,12 @@ namespace ShadowCardSmash.Editor
             tmp.fontStyle = FontStyles.Bold;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.color = Color.white;
+
+            // 设置中文字体
+            if (_chineseFont != null)
+            {
+                tmp.font = _chineseFont;
+            }
 
             SavePrefab(floatingText, "FloatingText");
             Object.DestroyImmediate(floatingText);
@@ -530,32 +608,38 @@ namespace ShadowCardSmash.Editor
             center.GetComponent<RectTransform>().offsetMin = new Vector2(SIDE_PANEL_WIDTH, 0);
             center.GetComponent<RectTransform>().offsetMax = new Vector2(-SIDE_PANEL_WIDTH, 0);
 
-            var vlg = center.AddComponent<VerticalLayoutGroup>();
-            vlg.padding = new RectOffset(20, 20, 20, 20);
-            vlg.spacing = 30;
-            vlg.childAlignment = TextAnchor.MiddleCenter;
-            vlg.childForceExpandWidth = true;
-            vlg.childForceExpandHeight = true;
+            // 不使用 VerticalLayoutGroup，让子元素各自定位
 
-            // OpponentField
-            CreateFieldRow("OpponentField", center.transform, true);
+            // OpponentField - 在中心偏上
+            CreateFieldRow("OpponentField", center.transform, true, 70f);
 
-            // MyField
-            CreateFieldRow("MyField", center.transform, false);
+            // MyField - 在中心偏下
+            CreateFieldRow("MyField", center.transform, false, -70f);
         }
 
-        private static void CreateFieldRow(string name, Transform parent, bool isOpponent)
+        private static void CreateFieldRow(string name, Transform parent, bool isOpponent, float yOffset)
         {
             var row = CreateUIElement(name, parent, Vector2.zero, new Vector2(0, TILE_HEIGHT));
-            var layoutElement = row.AddComponent<LayoutElement>();
-            layoutElement.preferredHeight = TILE_HEIGHT;
-            layoutElement.flexibleWidth = 1;
+            var rect = row.GetComponent<RectTransform>();
 
+            // 中心锚点
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = new Vector2(0, yOffset);
+
+            // 计算宽度：6个格子 + 5个间距
+            float totalWidth = TILE_COUNT * TILE_WIDTH + (TILE_COUNT - 1) * 15;
+            rect.sizeDelta = new Vector2(totalWidth, TILE_HEIGHT);
+
+            // 添加 HorizontalLayoutGroup
             var hlg = row.AddComponent<HorizontalLayoutGroup>();
             hlg.spacing = 15;
             hlg.childAlignment = TextAnchor.MiddleCenter;
             hlg.childForceExpandWidth = false;
             hlg.childForceExpandHeight = false;
+            hlg.childControlWidth = false;
+            hlg.childControlHeight = false;
 
             // 加载TileSlot预制体
             var tilePrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PREFAB_PATH}/TileSlot.prefab");
@@ -1066,6 +1150,12 @@ namespace ShadowCardSmash.Editor
             tmp.fontSize = fontSize;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.color = Color.white;
+
+            // 设置中文字体
+            if (_chineseFont != null)
+            {
+                tmp.font = _chineseFont;
+            }
 
             var layout = obj.AddComponent<LayoutElement>();
             layout.preferredWidth = size.x;
