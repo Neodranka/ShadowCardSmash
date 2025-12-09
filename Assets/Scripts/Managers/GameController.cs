@@ -44,6 +44,8 @@ namespace ShadowCardSmash.Managers
         public event Action<int> OnTurnChanged;
         public event Action<int, string> OnGameOver;
         public event Action OnGameStarted;
+        public event Action OnMulliganPhaseStart;
+        public event Action OnMulliganPhaseEnd;
 
         private void Awake()
         {
@@ -167,7 +169,16 @@ namespace ShadowCardSmash.Managers
             OnGameStarted?.Invoke();
             OnStateChanged?.Invoke();
 
-            Debug.Log($"GameController: Game started, turn {_currentState.turnNumber}, player {_currentState.currentPlayerId}");
+            // 检查是否进入换牌阶段
+            if (_currentState.phase == GamePhase.Mulligan)
+            {
+                OnMulliganPhaseStart?.Invoke();
+                Debug.Log("GameController: Entering mulligan phase");
+            }
+            else
+            {
+                Debug.Log($"GameController: Game started, turn {_currentState.turnNumber}, player {_currentState.currentPlayerId}");
+            }
         }
 
         /// <summary>
@@ -176,6 +187,70 @@ namespace ShadowCardSmash.Managers
         private void UpdateTurnState()
         {
             _isMyTurn = _currentState.currentPlayerId == _localPlayerId;
+        }
+
+        #endregion
+
+        #region Mulligan Methods
+
+        /// <summary>
+        /// 检查是否在换牌阶段
+        /// </summary>
+        public bool IsInMulliganPhase()
+        {
+            return _ruleEngine != null && _ruleEngine.IsInMulliganPhase();
+        }
+
+        /// <summary>
+        /// 切换换牌选择
+        /// </summary>
+        public void ToggleMulliganSelection(int playerId, int handIndex)
+        {
+            if (_ruleEngine == null) return;
+            _ruleEngine.ToggleMulliganSelection(playerId, handIndex);
+        }
+
+        /// <summary>
+        /// 确认换牌
+        /// </summary>
+        public List<GameEvent> ConfirmMulligan(int playerId)
+        {
+            if (_ruleEngine == null) return new List<GameEvent>();
+
+            var events = _ruleEngine.ConfirmMulligan(playerId);
+            _currentState = _ruleEngine.CurrentState;
+
+            ProcessEvents(events);
+
+            // 检查换牌阶段是否结束
+            if (_currentState.phase != GamePhase.Mulligan)
+            {
+                OnMulliganPhaseEnd?.Invoke();
+                UpdateTurnState();
+                OnStateChanged?.Invoke();
+                OnTurnChanged?.Invoke(_currentState.currentPlayerId);
+                Debug.Log($"GameController: Mulligan phase ended, game starting with player {_currentState.currentPlayerId}");
+            }
+
+            return events;
+        }
+
+        /// <summary>
+        /// 获取玩家选择的换牌索引
+        /// </summary>
+        public List<int> GetMulliganSelectedIndices(int playerId)
+        {
+            if (_ruleEngine == null) return new List<int>();
+            return _ruleEngine.GetMulliganSelectedIndices(playerId);
+        }
+
+        /// <summary>
+        /// 检查玩家是否已完成换牌
+        /// </summary>
+        public bool IsPlayerMulliganReady(int playerId)
+        {
+            if (_ruleEngine == null) return false;
+            return _ruleEngine.IsPlayerMulliganReady(playerId);
         }
 
         #endregion

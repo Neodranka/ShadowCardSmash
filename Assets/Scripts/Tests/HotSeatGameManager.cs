@@ -19,6 +19,9 @@ namespace ShadowCardSmash.Tests
         public BattleUIController battleUI;
         public GameController gameController;
 
+        [Header("Mulligan UI")]
+        public MulliganUI mulliganUI;
+
         [Header("Player Switch UI")]
         public GameObject playerSwitchPrompt;
         public TextMeshProUGUI switchMessageText;
@@ -33,12 +36,15 @@ namespace ShadowCardSmash.Tests
 
         [Header("Test Settings")]
         public bool useTestDeck = true;
+        public bool skipMulligan = false; // 跳过换牌阶段
         public int randomSeed = -1; // -1 = 随机
 
         // 内部状态
         private TestCardDatabase _cardDatabase;
         private int _currentViewingPlayer = 0;
         private bool _isWaitingForSwitch = false;
+        private int _currentMulliganPlayer = 0;
+        private bool _isInMulliganPhase = false;
 
         void Start()
         {
@@ -128,6 +134,8 @@ namespace ShadowCardSmash.Tests
                 Debug.Log("Step 7: 订阅游戏事件");
                 gameController.OnTurnChanged += OnTurnChanged;
                 gameController.OnGameOver += OnGameOver;
+                gameController.OnMulliganPhaseStart += OnMulliganPhaseStart;
+                gameController.OnMulliganPhaseEnd += OnMulliganPhaseEnd;
 
                 // 8. 初始化UI
                 Debug.Log($"Step 8: 初始化UI (battleUI is null: {battleUI == null})");
@@ -141,6 +149,15 @@ namespace ShadowCardSmash.Tests
                 else
                 {
                     Debug.LogError("  battleUI 为空！请在 Inspector 中设置引用");
+                }
+
+                // 8.5 初始化 Mulligan UI
+                if (mulliganUI != null)
+                {
+                    mulliganUI.SetCardDatabase(_cardDatabase);
+                    mulliganUI.OnCardToggled += OnMulliganCardToggled;
+                    mulliganUI.OnConfirmClicked += OnMulliganConfirmed;
+                    Debug.Log("  MulliganUI 初始化完成");
                 }
 
                 // 9. 开始游戏（会自动触发 UI 刷新）
@@ -312,7 +329,20 @@ namespace ShadowCardSmash.Tests
             {
                 gameController.OnTurnChanged -= OnTurnChanged;
                 gameController.OnGameOver -= OnGameOver;
+                gameController.OnMulliganPhaseStart -= OnMulliganPhaseStart;
+                gameController.OnMulliganPhaseEnd -= OnMulliganPhaseEnd;
             }
+
+            // 取消 Mulligan UI 事件
+            if (mulliganUI != null)
+            {
+                mulliganUI.OnCardToggled -= OnMulliganCardToggled;
+                mulliganUI.OnConfirmClicked -= OnMulliganConfirmed;
+            }
+
+            // 重置 Mulligan 状态
+            _isInMulliganPhase = false;
+            _currentMulliganPlayer = 0;
 
             // 重新初始化游戏
             InitializeTestGame();
@@ -327,6 +357,139 @@ namespace ShadowCardSmash.Tests
 #else
             Application.Quit();
 #endif
+        }
+
+        #endregion
+
+        #region Mulligan
+
+        void OnMulliganPhaseStart()
+        {
+            Debug.Log("HotSeatGameManager: 进入换牌阶段");
+
+            if (skipMulligan)
+            {
+                // 跳过换牌阶段
+                Debug.Log("HotSeatGameManager: 跳过换牌阶段");
+                gameController.ConfirmMulligan(0);
+                gameController.ConfirmMulligan(1);
+                return;
+            }
+
+            _isInMulliganPhase = true;
+            _currentMulliganPlayer = 0;
+            ShowMulliganForPlayer(0);
+        }
+
+        void OnMulliganPhaseEnd()
+        {
+            Debug.Log("HotSeatGameManager: 换牌阶段结束");
+            _isInMulliganPhase = false;
+
+            if (mulliganUI != null)
+            {
+                mulliganUI.Hide();
+            }
+
+            // 初始化战斗UI
+            if (battleUI != null)
+            {
+                battleUI.Initialize(_cardDatabase, _currentViewingPlayer);
+                battleUI.SetMyTurn(gameController.IsMyTurn);
+                battleUI.RefreshAllUI();
+            }
+        }
+
+        void ShowMulliganForPlayer(int playerId)
+        {
+            if (mulliganUI == null)
+            {
+                Debug.LogWarning("HotSeatGameManager: MulliganUI 未设置，跳过换牌");
+                gameController.ConfirmMulligan(playerId);
+                return;
+            }
+
+            _currentMulliganPlayer = playerId;
+            var player = gameController.CurrentState.players[playerId];
+            mulliganUI.Show(player.hand, playerId, playerId == 1);
+            Debug.Log($"HotSeatGameManager: 显示玩家{playerId}的换牌界面，手牌数量={player.hand.Count}");
+        }
+
+        void OnMulliganCardToggled(int handIndex)
+        {
+            // 同步到 GameController
+            gameController.ToggleMulliganSelection(_currentMulliganPlayer, handIndex);
+            Debug.Log($"HotSeatGameManager: 玩家{_currentMulliganPlayer}切换选择卡牌索引{handIndex}");
+        }
+
+        void OnMulliganConfirmed()
+        {
+            Debug.Log($"HotSeatGameManager: 玩家{_currentMulliganPlayer}确认换牌");
+
+            // 确认当前玩家的换牌
+            var events = gameController.ConfirmMulligan(_currentMulliganPlayer);
+
+            // 检查游戏是否已经开始（换牌阶段结束）
+            if (!gameController.IsInMulliganPhase())
+            {
+                // 换牌阶段结束，OnMulliganPhaseEnd 会被调用
+                return;
+            }
+
+            // 还在换牌阶段，切换到下一个玩家
+            mulliganUI.Hide();
+
+            // 热座模式：显示切换提示
+            ShowPlayerSwitchForMulligan();
+        }
+
+        void ShowPlayerSwitchForMulligan()
+        {
+            _isWaitingForSwitch = true;
+
+            if (playerSwitchPrompt != null)
+            {
+                playerSwitchPrompt.SetActive(true);
+            }
+
+            if (switchMessageText != null)
+            {
+                switchMessageText.text = "请将设备交给对方玩家进行换牌";
+            }
+
+            if (nextPlayerText != null)
+            {
+                int nextPlayer = 1 - _currentMulliganPlayer;
+                nextPlayerText.text = $"轮到：玩家 {nextPlayer + 1}";
+            }
+
+            // 设置确认按钮点击时进入下一个玩家的换牌
+            if (confirmSwitchButton != null)
+            {
+                confirmSwitchButton.onClick.RemoveAllListeners();
+                confirmSwitchButton.onClick.AddListener(OnMulliganSwitchConfirmed);
+            }
+        }
+
+        void OnMulliganSwitchConfirmed()
+        {
+            _isWaitingForSwitch = false;
+
+            if (playerSwitchPrompt != null)
+            {
+                playerSwitchPrompt.SetActive(false);
+            }
+
+            // 恢复原来的确认按钮功能
+            if (confirmSwitchButton != null)
+            {
+                confirmSwitchButton.onClick.RemoveAllListeners();
+                confirmSwitchButton.onClick.AddListener(OnConfirmSwitch);
+            }
+
+            // 显示下一个玩家的换牌界面
+            int nextPlayer = 1 - _currentMulliganPlayer;
+            ShowMulliganForPlayer(nextPlayer);
         }
 
         #endregion
@@ -383,6 +546,15 @@ namespace ShadowCardSmash.Tests
             {
                 gameController.OnTurnChanged -= OnTurnChanged;
                 gameController.OnGameOver -= OnGameOver;
+                gameController.OnMulliganPhaseStart -= OnMulliganPhaseStart;
+                gameController.OnMulliganPhaseEnd -= OnMulliganPhaseEnd;
+            }
+
+            // 清理 Mulligan UI 事件
+            if (mulliganUI != null)
+            {
+                mulliganUI.OnCardToggled -= OnMulliganCardToggled;
+                mulliganUI.OnConfirmClicked -= OnMulliganConfirmed;
             }
         }
     }

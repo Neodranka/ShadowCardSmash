@@ -15,6 +15,7 @@ namespace ShadowCardSmash.Core.Rules
         private TurnManager _turnManager;
         private CombatResolver _combatResolver;
         private EvolutionSystem _evolutionSystem;
+        private MulliganManager _mulliganManager;
         private ICardDatabase _cardDatabase;
         private System.Random _rng;
         private int _instanceIdCounter;
@@ -36,6 +37,7 @@ namespace ShadowCardSmash.Core.Rules
             _turnManager = new TurnManager(_effectSystem, cardDatabase, GenerateInstanceId);
             _combatResolver = new CombatResolver(_effectSystem, cardDatabase);
             _evolutionSystem = new EvolutionSystem(_effectSystem, cardDatabase);
+            _mulliganManager = new MulliganManager(cardDatabase, GenerateInstanceId);
         }
 
         /// <summary>
@@ -90,13 +92,24 @@ namespace ShadowCardSmash.Core.Rules
             // 生成游戏开始事件
             events.Add(new GameStartEvent(0, _currentState.randomSeed));
 
-            // 开始先手的第一回合
-            var turnStartEvents = _turnManager.StartTurn(_currentState, 0);
-            events.AddRange(turnStartEvents);
+            // 进入换牌阶段（而不是直接开始游戏）
+            _mulliganManager.InitializeMulligan(_currentState);
 
-            // 抽牌阶段
-            var drawPhaseEvents = _turnManager.DrawPhase(_currentState, 0);
-            events.AddRange(drawPhaseEvents);
+            return events;
+        }
+
+        /// <summary>
+        /// 开始游戏（跳过换牌阶段，用于测试或快速开始）
+        /// </summary>
+        public List<GameEvent> StartGameSkipMulligan()
+        {
+            var events = StartGame();
+
+            // 直接结束换牌阶段
+            _currentState.mulliganState.playerReady[0] = true;
+            _currentState.mulliganState.playerReady[1] = true;
+            var startEvents = _mulliganManager.EndMulliganPhase(_currentState);
+            events.AddRange(startEvents);
 
             return events;
         }
@@ -724,5 +737,61 @@ namespace ShadowCardSmash.Core.Rules
 
             return events;
         }
+
+        #region Mulligan Methods
+
+        /// <summary>
+        /// 切换换牌选择
+        /// </summary>
+        public void ToggleMulliganSelection(int playerId, int handIndex)
+        {
+            if (_currentState.phase != GamePhase.Mulligan) return;
+            _mulliganManager.ToggleCardSelection(_currentState, playerId, handIndex);
+        }
+
+        /// <summary>
+        /// 确认换牌
+        /// </summary>
+        public List<GameEvent> ConfirmMulligan(int playerId)
+        {
+            if (_currentState.phase != GamePhase.Mulligan) return new List<GameEvent>();
+
+            var events = _mulliganManager.ConfirmMulligan(_currentState, playerId);
+
+            // 检查是否双方都完成
+            if (_mulliganManager.IsMulliganComplete(_currentState))
+            {
+                var startEvents = _mulliganManager.EndMulliganPhase(_currentState);
+                events.AddRange(startEvents);
+            }
+
+            return events;
+        }
+
+        /// <summary>
+        /// 获取玩家选择的换牌索引
+        /// </summary>
+        public List<int> GetMulliganSelectedIndices(int playerId)
+        {
+            return _mulliganManager.GetSelectedIndices(_currentState, playerId);
+        }
+
+        /// <summary>
+        /// 检查玩家是否已完成换牌
+        /// </summary>
+        public bool IsPlayerMulliganReady(int playerId)
+        {
+            return _mulliganManager.IsPlayerReady(_currentState, playerId);
+        }
+
+        /// <summary>
+        /// 检查是否在换牌阶段
+        /// </summary>
+        public bool IsInMulliganPhase()
+        {
+            return _currentState.phase == GamePhase.Mulligan;
+        }
+
+        #endregion
     }
 }

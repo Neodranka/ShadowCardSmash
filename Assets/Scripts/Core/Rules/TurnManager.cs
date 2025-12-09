@@ -60,6 +60,7 @@ namespace ShadowCardSmash.Core.Rules
                 {
                     tile.occupant.canAttack = true;
                     tile.occupant.attackedThisTurn = false;
+                    tile.occupant.summonedThisTurn = false; // 不再是入场当回合
                 }
             }
 

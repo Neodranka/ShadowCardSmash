@@ -100,8 +100,26 @@ namespace ShadowCardSmash.UI.Battle
 
         private void ShowCardList(List<int> cardIds)
         {
+            Debug.Log($"CardListPopup.ShowCardList: 显示 {cardIds?.Count ?? 0} 张卡牌, _cardDatabase={((_cardDatabase != null) ? "已设置" : "null")}");
+
             // 清除现有内容
             ClearContent();
+
+            if (cardIds == null || cardIds.Count == 0)
+            {
+                Debug.Log("CardListPopup: 卡牌列表为空");
+                // 更新计数
+                if (cardCountText != null)
+                {
+                    cardCountText.text = "共 0 张";
+                }
+                // 仍然显示弹窗
+                if (popupRoot != null)
+                {
+                    popupRoot.SetActive(true);
+                }
+                return;
+            }
 
             // 更新计数
             if (cardCountText != null)
@@ -120,6 +138,8 @@ namespace ShadowCardSmash.UI.Battle
                 cardCounts[cardId]++;
             }
 
+            Debug.Log($"CardListPopup: 统计完成，共 {cardCounts.Count} 种卡牌");
+
             // 按费用排序显示
             var sortedCards = new List<KeyValuePair<int, int>>(cardCounts);
             sortedCards.Sort((a, b) =>
@@ -133,8 +153,11 @@ namespace ShadowCardSmash.UI.Battle
             // 创建卡牌项
             foreach (var kvp in sortedCards)
             {
+                Debug.Log($"CardListPopup: 创建卡牌项 cardId={kvp.Key}, count={kvp.Value}");
                 CreateCardItem(kvp.Key, kvp.Value);
             }
+
+            Debug.Log($"CardListPopup: 创建了 {_cardItems.Count} 个卡牌项");
 
             // 重置滚动位置
             if (scrollRect != null)
@@ -151,10 +174,20 @@ namespace ShadowCardSmash.UI.Battle
 
         private void CreateCardItem(int cardId, int count)
         {
-            if (contentContainer == null) return;
+            if (contentContainer == null)
+            {
+                Debug.LogWarning("CardListPopup.CreateCardItem: contentContainer 为 null");
+                return;
+            }
 
             CardData cardData = _cardDatabase?.GetCardById(cardId);
-            if (cardData == null) return;
+            if (cardData == null)
+            {
+                Debug.LogWarning($"CardListPopup.CreateCardItem: 找不到 cardId={cardId} 的卡牌数据");
+                return;
+            }
+
+            Debug.Log($"CardListPopup.CreateCardItem: 创建 {cardData.cardName} x{count}");
 
             // 如果有预制体，使用预制体
             GameObject itemObj;

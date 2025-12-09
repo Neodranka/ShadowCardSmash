@@ -769,6 +769,7 @@ namespace ShadowCardSmash.Editor
             CreateCardListPopup(popups.transform);
             CreatePlayerSwitchPrompt(popups.transform);
             CreateGameOverPanel(popups.transform);
+            CreateMulliganPanel(popups.transform);
         }
 
         private static void CreateCardDetailPopup(Transform parent)
@@ -971,6 +972,59 @@ namespace ShadowCardSmash.Editor
             panel.SetActive(false);
         }
 
+        private static void CreateMulliganPanel(Transform parent)
+        {
+            // 创建 MulliganPanel 根节点（不会被禁用，组件挂在这里）
+            var panelRoot = CreateUIElement("MulliganPanel", parent, Vector2.zero, Vector2.zero);
+            SetAnchors(panelRoot, Vector2.zero, Vector2.one, Vector2.zero);
+            panelRoot.GetComponent<RectTransform>().sizeDelta = Vector2.zero;
+
+            var mulliganUI = panelRoot.AddComponent<MulliganUI>();
+
+            // 创建实际的面板内容（这个会被显示/隐藏）
+            var panel = CreateUIElement("Panel", panelRoot.transform, Vector2.zero, Vector2.zero);
+            SetAnchors(panel, Vector2.zero, Vector2.one, Vector2.zero);
+            panel.GetComponent<RectTransform>().sizeDelta = Vector2.zero;
+            mulliganUI.mulliganPanel = panel;
+
+            // Background (半透明遮罩)
+            var bg = CreateUIElement("Background", panel.transform, Vector2.zero, Vector2.zero);
+            SetAnchors(bg, Vector2.zero, Vector2.one, Vector2.zero);
+            bg.GetComponent<RectTransform>().sizeDelta = Vector2.zero;
+            var bgImage = bg.AddComponent<Image>();
+            bgImage.color = new Color(0, 0, 0, 0.85f);
+
+            // ContentPanel (居中面板)
+            var content = CreateUIElement("ContentPanel", panel.transform, Vector2.zero, new Vector2(1200, 500));
+            var contentImage = content.AddComponent<Image>();
+            contentImage.color = new Color(0.2f, 0.15f, 0.1f, 1f);
+
+            // InstructionText
+            var instruction = CreateTextElement("InstructionText", content.transform, new Vector2(0, 200), new Vector2(1000, 40), "点击要换掉的牌，然后确认", 24);
+            mulliganUI.instructionText = instruction.GetComponent<TextMeshProUGUI>();
+
+            // CardContainer (Horizontal Layout)
+            var cardContainer = CreateUIElement("CardContainer", content.transform, Vector2.zero, new Vector2(1100, 280));
+            var hlg = cardContainer.AddComponent<HorizontalLayoutGroup>();
+            hlg.spacing = 20;
+            hlg.childAlignment = TextAnchor.MiddleCenter;
+            hlg.childForceExpandWidth = false;
+            hlg.childForceExpandHeight = false;
+            mulliganUI.cardContainer = cardContainer.transform;
+
+            // SelectedCountText
+            var selectedCount = CreateTextElement("SelectedCountText", content.transform, new Vector2(0, -160), new Vector2(200, 30), "已选择 0 张", 18);
+            mulliganUI.selectedCountText = selectedCount.GetComponent<TextMeshProUGUI>();
+
+            // ConfirmButton
+            var confirmBtn = CreateButton("ConfirmButton", content.transform, "确认换牌", new Vector2(200, 60));
+            confirmBtn.GetComponent<RectTransform>().anchoredPosition = new Vector2(0, -210);
+            mulliganUI.confirmButton = confirmBtn.GetComponent<Button>();
+
+            // 初始隐藏内容面板
+            panel.SetActive(false);
+        }
+
         private static void CreateGameManager()
         {
             var manager = new GameObject("GameManager");
@@ -1093,6 +1147,13 @@ namespace ShadowCardSmash.Editor
                     _hotSeatManager.gameOverText = gameOverPanel.Find("ContentPanel/GameOverText")?.GetComponent<TextMeshProUGUI>();
                     _hotSeatManager.restartButton = gameOverPanel.Find("ContentPanel/RestartButton")?.GetComponent<Button>();
                     _hotSeatManager.quitButton = gameOverPanel.Find("ContentPanel/QuitButton")?.GetComponent<Button>();
+                }
+
+                // 连接MulliganUI
+                var mulliganPanel = popups?.Find("MulliganPanel");
+                if (mulliganPanel != null)
+                {
+                    _hotSeatManager.mulliganUI = mulliganPanel.GetComponent<MulliganUI>();
                 }
             }
 

@@ -36,6 +36,7 @@ namespace ShadowCardSmash.UI.Battle
 
         // 事件
         public event Action<TileSlotController> OnTileClicked;
+        public event Action<TileSlotController> OnTileRightClicked;
         public event Action<TileSlotController> OnTileHovered;
         public event Action<TileSlotController> OnTileUnhovered;
         public event Action<TileSlotController, CardViewController> OnCardDropped;
@@ -195,6 +196,10 @@ namespace ShadowCardSmash.UI.Battle
             if (eventData.button == PointerEventData.InputButton.Left)
             {
                 OnTileClicked?.Invoke(this);
+            }
+            else if (eventData.button == PointerEventData.InputButton.Right)
+            {
+                OnTileRightClicked?.Invoke(this);
             }
         }
 

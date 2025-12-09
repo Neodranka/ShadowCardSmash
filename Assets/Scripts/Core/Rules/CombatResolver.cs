@@ -171,12 +171,9 @@ namespace ShadowCardSmash.Core.Rules
                 }
 
                 // 检查召唤失调（突进不能攻击玩家，疾驰可以）
-                // 如果有突进但没有疾驰，不能攻击玩家
-                if (attacker.hasRush && !attacker.hasStorm)
+                // 只有在入场当回合，且有突进但没有疾驰时，才不能攻击玩家
+                if (attacker.summonedThisTurn && attacker.hasRush && !attacker.hasStorm)
                 {
-                    // 需要检查是否本回合入场
-                    // 简化处理：如果有Rush但没Storm，且canAttack是因为Rush获得的，不能攻击玩家
-                    // 这里假设如果canAttack为true且有Rush，是可以攻击随从的
                     return false;
                 }
 
@@ -219,7 +216,8 @@ namespace ShadowCardSmash.Core.Rules
 
             var opponentPlayer = state.GetPlayer(1 - attacker.ownerId);
             bool hasWard = opponentPlayer.HasWardMinion();
-            bool canAttackPlayer = !attacker.hasRush || attacker.hasStorm;
+            // 只有在入场当回合，且有突进但没有疾驰时，才不能攻击玩家
+            bool canAttackPlayer = !(attacker.summonedThisTurn && attacker.hasRush && !attacker.hasStorm);
 
             if (hasWard)
             {

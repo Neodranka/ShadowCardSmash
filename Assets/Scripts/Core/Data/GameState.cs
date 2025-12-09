@@ -34,6 +34,11 @@ namespace ShadowCardSmash.Core.Data
         public int randomSeed;
 
         /// <summary>
+        /// 换牌阶段状态
+        /// </summary>
+        public MulliganState mulliganState;
+
+        /// <summary>
         /// 默认构造函数
         /// </summary>
         public GameState()

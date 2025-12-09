@@ -57,6 +57,11 @@ namespace ShadowCardSmash.Core.Data
         public bool attackedThisTurn;
 
         /// <summary>
+        /// 是否为入场/进化当回合（用于判断突进是否限制攻击玩家）
+        /// </summary>
+        public bool summonedThisTurn;
+
+        /// <summary>
         /// 是否被沉默
         /// </summary>
         public bool isSilenced;
@@ -114,6 +119,7 @@ namespace ShadowCardSmash.Core.Data
                 isEvolved = false,
                 canAttack = false, // 默认召唤失调
                 attackedThisTurn = false,
+                summonedThisTurn = true, // 入场当回合
                 isSilenced = false,
                 currentCountdown = cardData.countdown,
                 hasWard = false,
@@ -180,6 +186,10 @@ namespace ShadowCardSmash.Core.Data
             maxHealth += healthGain;
             isEvolved = true;
             hasRush = true; // 进化获得突进
+            canAttack = true; // 进化后可以立即攻击
+            // 注意：summonedThisTurn 保持不变
+            // 如果是入场当回合进化，依然受 Rush 限制不能打脸
+            // 如果是之后回合进化，summonedThisTurn=false，可以正常打脸
         }
 
         /// <summary>

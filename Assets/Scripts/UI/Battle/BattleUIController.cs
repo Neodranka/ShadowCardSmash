@@ -230,6 +230,7 @@ namespace ShadowCardSmash.UI.Battle
                 if (tile != null)
                 {
                     tile.OnTileClicked += OnTileClicked;
+                    tile.OnTileRightClicked += OnTileRightClicked;
                 }
             }
         }
@@ -657,6 +658,22 @@ namespace ShadowCardSmash.UI.Battle
                         CancelCurrentAction();
                     }
                     break;
+            }
+        }
+
+        private void OnTileRightClicked(TileSlotController tile)
+        {
+            // 右键点击格子显示卡牌详情
+            if (tile != null && !tile.IsEmpty && tile.CurrentOccupant != null)
+            {
+                var cardView = tile.CurrentOccupant;
+                var cardData = _cardDatabase?.GetCardById(cardView.RuntimeCard?.cardId ?? cardView.CardData?.cardId ?? 0);
+
+                if (cardData != null && cardDetailPopup != null)
+                {
+                    cardDetailPopup.Show(cardView.RuntimeCard, cardData);
+                    Debug.Log($"BattleUIController: 右键显示格子{tile.tileIndex}的卡牌详情 - {cardData.cardName}");
+                }
             }
         }
 
