@@ -467,9 +467,19 @@ namespace ShadowCardSmash.Core.Rules
                 }
             }
 
-            // 检查启动是否破坏护符（写在效果参数中）
+            // 检查启动是否破坏护符
+            // 规则：如果效果的parameters中包含"destroy_after"则破坏
             bool destroyAfterActivate = false;
-            // TODO: 根据卡牌配置决定是否破坏
+            foreach (var effect in cardData.effects)
+            {
+                if (effect.trigger == EffectTrigger.OnActivate &&
+                    effect.parameters != null &&
+                    effect.parameters.Contains("destroy_after"))
+                {
+                    destroyAfterActivate = true;
+                    break;
+                }
+            }
 
             events.Add(new AmuletActivatedEvent(
                 action.playerId,
@@ -477,6 +487,48 @@ namespace ShadowCardSmash.Core.Rules
                 amulet.cardId,
                 destroyAfterActivate
             ));
+
+            // 如果需要破坏护符
+            if (destroyAfterActivate)
+            {
+                // 从战场移除
+                var ownerField = _currentState.players[action.playerId].field;
+                for (int i = 0; i < ownerField.Length; i++)
+                {
+                    if (ownerField[i].occupant == amulet)
+                    {
+                        ownerField[i].RemoveUnit();
+
+                        // 触发谢幕效果（如果未被沉默）
+                        if (!amulet.isSilenced)
+                        {
+                            foreach (var effect in cardData.effects)
+                            {
+                                if (effect.trigger == EffectTrigger.OnDestroy)
+                                {
+                                    var destroyEvents = _effectSystem.ProcessEffect(
+                                        _currentState, amulet, action.playerId, effect, null);
+                                    events.AddRange(destroyEvents);
+                                }
+                            }
+                        }
+
+                        // 加入墓地
+                        _currentState.players[action.playerId].graveyard.Add(amulet.cardId);
+
+                        events.Add(new UnitDestroyedEvent(
+                            action.playerId,
+                            amulet.instanceId,
+                            amulet.cardId,
+                            i,
+                            action.playerId,
+                            false
+                        ));
+
+                        break;
+                    }
+                }
+            }
 
             return events;
         }

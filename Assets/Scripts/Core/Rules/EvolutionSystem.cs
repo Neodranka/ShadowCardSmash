@@ -32,12 +32,6 @@ namespace ShadowCardSmash.Core.Rules
         {
             var player = state.GetPlayer(playerId);
 
-            // 先手玩家没有进化点
-            if (playerId == 0)
-            {
-                return false;
-            }
-
             // 检查EP
             if (player.evolutionPoints <= 0)
             {
@@ -50,10 +44,9 @@ namespace ShadowCardSmash.Core.Rules
                 return false;
             }
 
-            // 检查回合数（后手第4回合起可用）
-            // 后手的第4回合 = 游戏总回合数 >= 2 时（因为每个玩家各行动一次算1轮）
-            // 简化：后手在游戏回合 >= 4 时可以进化
-            if (state.turnNumber < EVOLUTION_AVAILABLE_TURN)
+            // 先手从第5回合开始可用，后手从第4回合开始可用
+            int requiredTurn = (playerId == 0) ? 5 : EVOLUTION_AVAILABLE_TURN;
+            if (state.turnNumber < requiredTurn)
             {
                 return false;
             }

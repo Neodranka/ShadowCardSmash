@@ -102,14 +102,7 @@ namespace ShadowCardSmash.UI.Battle
             // 绑定牌库/墓地事件
             BindDeckGraveyardEvents();
 
-            // 订阅游戏控制器事件
-            if (gameController != null)
-            {
-                gameController.OnGameEvent += HandleGameEvent;
-                gameController.OnStateChanged += RefreshAllUI;
-                gameController.OnTurnChanged += OnTurnChanged;
-                gameController.OnGameOver += OnGameOver;
-            }
+            // 注意：游戏控制器事件订阅在 Initialize() 中完成，不在这里重复订阅
         }
 
         void OnDestroy()
@@ -155,7 +148,32 @@ namespace ShadowCardSmash.UI.Battle
             // 初始化格子索引
             InitializeTileIndices();
 
+            // 订阅游戏控制器事件（如果还没订阅）
+            SubscribeToGameController();
+
             Debug.Log($"BattleUIController: 初始化完成，本地玩家ID: {localPlayerId}");
+        }
+
+        /// <summary>
+        /// 订阅游戏控制器事件
+        /// </summary>
+        private void SubscribeToGameController()
+        {
+            if (gameController == null) return;
+
+            // 先取消订阅（避免重复订阅）
+            gameController.OnGameEvent -= HandleGameEvent;
+            gameController.OnStateChanged -= RefreshAllUI;
+            gameController.OnTurnChanged -= OnTurnChanged;
+            gameController.OnGameOver -= OnGameOver;
+
+            // 重新订阅
+            gameController.OnGameEvent += HandleGameEvent;
+            gameController.OnStateChanged += RefreshAllUI;
+            gameController.OnTurnChanged += OnTurnChanged;
+            gameController.OnGameOver += OnGameOver;
+
+            Debug.Log("BattleUIController: 已订阅 GameController 事件");
         }
 
         private void InitializeTileIndices()
@@ -450,7 +468,7 @@ namespace ShadowCardSmash.UI.Battle
             Debug.Log($"BattleUIController: 回合开始 - 玩家{playerId}");
 
             SetState(BattleUIState.Idle);
-            RefreshAllUI();
+            // 注意：不在这里调用 RefreshAllUI()，OnStateChanged 事件会触发刷新
 
             if (playerId == _localPlayerId)
             {

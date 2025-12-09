@@ -42,7 +42,7 @@ namespace ShadowCardSmash.Tests
 
         void Start()
         {
-            Debug.Log("HotSeatGameManager: 启动");
+            Debug.Log("=== HotSeatGameManager Start() 被调用 ===");
 
             // 初始化UI
             InitializeUI();
@@ -84,45 +84,80 @@ namespace ShadowCardSmash.Tests
 
         void InitializeTestGame()
         {
-            Debug.Log("HotSeatGameManager: 初始化测试游戏");
+            Debug.Log("=== HotSeatGameManager: InitializeTestGame 开始 ===");
 
-            // 1. 创建测试卡牌数据库
-            _cardDatabase = new TestCardDatabase();
-
-            // 2. 创建游戏控制器（如果没有引用）
-            if (gameController == null)
+            try
             {
-                var go = new GameObject("GameController");
-                gameController = go.AddComponent<GameController>();
+                // 1. 创建测试卡牌数据库
+                Debug.Log("Step 1: 创建测试卡牌数据库");
+                _cardDatabase = new TestCardDatabase();
+                Debug.Log($"  卡牌数据库创建成功，卡牌数量: {_cardDatabase.GetAllCards()?.Count ?? 0}");
+
+                // 2. 创建游戏控制器（如果没有引用）
+                Debug.Log("Step 2: 创建游戏控制器");
+                if (gameController == null)
+                {
+                    var go = new GameObject("GameController_Runtime");
+                    gameController = go.AddComponent<GameController>();
+                    Debug.Log("  GameController 已动态创建");
+                }
+                else
+                {
+                    Debug.Log("  GameController 已存在引用");
+                }
+
+                // 3. 初始化游戏控制器
+                Debug.Log("Step 3: 初始化游戏控制器");
+                gameController.Initialize(_cardDatabase);
+
+                // 4. 创建测试牌库
+                Debug.Log("Step 4: 创建测试牌库");
+                var deck0 = CreateTestDeckData("玩家1卡组", HeroClass.ClassA);
+                var deck1 = CreateTestDeckData("玩家2卡组", HeroClass.ClassB);
+                Debug.Log($"  牌库创建成功: P0={deck0.cards.Count}张, P1={deck1.cards.Count}张");
+
+                // 5. 使用随机种子
+                int seed = randomSeed >= 0 ? randomSeed : UnityEngine.Random.Range(0, int.MaxValue);
+                Debug.Log($"Step 5: 使用随机种子 {seed}");
+
+                // 6. 初始化本地游戏
+                Debug.Log("Step 6: 初始化本地游戏");
+                gameController.InitializeLocalGame(deck0, deck1, seed);
+
+                // 7. 订阅游戏事件
+                Debug.Log("Step 7: 订阅游戏事件");
+                gameController.OnTurnChanged += OnTurnChanged;
+                gameController.OnGameOver += OnGameOver;
+
+                // 8. 初始化UI
+                Debug.Log($"Step 8: 初始化UI (battleUI is null: {battleUI == null})");
+                if (battleUI != null)
+                {
+                    // 设置 BattleUIController 的 gameController 引用
+                    battleUI.gameController = gameController;
+                    battleUI.Initialize(_cardDatabase, _currentViewingPlayer);
+                    Debug.Log("  BattleUIController 初始化完成");
+                }
+                else
+                {
+                    Debug.LogError("  battleUI 为空！请在 Inspector 中设置引用");
+                }
+
+                // 9. 开始游戏（会自动触发 UI 刷新）
+                Debug.Log("Step 9: 开始游戏");
+                gameController.StartGame();
+
+                Debug.Log($"=== HotSeatGameManager: 游戏初始化完成 ===");
+                Debug.Log($"  种子={seed}，先手玩家={gameController.CurrentState?.currentPlayerId}");
+                Debug.Log($"  P0 手牌: {gameController.CurrentState?.players[0]?.hand?.Count}");
+                Debug.Log($"  P1 手牌: {gameController.CurrentState?.players[1]?.hand?.Count}");
             }
-
-            // 3. 初始化游戏控制器
-            gameController.Initialize(_cardDatabase);
-
-            // 4. 创建测试牌库
-            var deck0 = CreateTestDeckData("玩家1卡组", HeroClass.ClassA);
-            var deck1 = CreateTestDeckData("玩家2卡组", HeroClass.ClassB);
-
-            // 5. 使用随机种子
-            int seed = randomSeed >= 0 ? randomSeed : UnityEngine.Random.Range(0, int.MaxValue);
-
-            // 6. 初始化本地游戏
-            gameController.InitializeLocalGame(deck0, deck1, seed);
-
-            // 7. 订阅游戏事件
-            gameController.OnTurnChanged += OnTurnChanged;
-            gameController.OnGameOver += OnGameOver;
-
-            // 8. 初始化UI
-            if (battleUI != null)
+            catch (System.Exception e)
             {
-                battleUI.Initialize(_cardDatabase, _currentViewingPlayer);
+                Debug.LogError($"=== HotSeatGameManager: 初始化失败 ===");
+                Debug.LogError($"错误信息: {e.Message}");
+                Debug.LogError($"堆栈跟踪: {e.StackTrace}");
             }
-
-            // 9. 开始游戏
-            gameController.StartGame();
-
-            Debug.Log($"HotSeatGameManager: 游戏开始，种子={seed}，先手玩家={gameController.CurrentState.currentPlayerId}");
         }
 
         DeckData CreateTestDeckData(string name, HeroClass heroClass)

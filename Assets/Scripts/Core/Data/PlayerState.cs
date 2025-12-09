@@ -130,7 +130,7 @@ namespace ShadowCardSmash.Core.Data
                 maxHealth = MAX_HEALTH,
                 mana = 0,
                 maxMana = 0,
-                evolutionPoints = playerId == 1 ? SECOND_PLAYER_EP : 0, // 后手3EP
+                evolutionPoints = SECOND_PLAYER_EP, // 双方都有3EP，但开放时机不同
                 hasEvolvedThisTurn = false,
                 fatigueCounter = 0,
                 deck = new List<int>(deckCardIds),

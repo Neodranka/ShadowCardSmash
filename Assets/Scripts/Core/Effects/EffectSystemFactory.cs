@@ -45,12 +45,12 @@ namespace ShadowCardSmash.Core.Effects
             effectSystem.RegisterExecutor(EffectType.Silence, new SilenceExecutor());
             effectSystem.RegisterExecutor(EffectType.Discard, new DiscardExecutor());
             effectSystem.RegisterExecutor(EffectType.GainKeyword, new GainKeywordExecutor());
+            effectSystem.RegisterExecutor(EffectType.GainCost, new GainManaExecutor());
 
             // TODO: 实现更多效果执行器
             // effectSystem.RegisterExecutor(EffectType.AddToHand, new AddToHandExecutor());
             // effectSystem.RegisterExecutor(EffectType.Transform, new TransformExecutor());
             // effectSystem.RegisterExecutor(EffectType.Evolve, new EvolveExecutor());
-            // effectSystem.RegisterExecutor(EffectType.GainCost, new GainCostExecutor());
             // effectSystem.RegisterExecutor(EffectType.TileEffect, new TileEffectExecutor());
         }
     }

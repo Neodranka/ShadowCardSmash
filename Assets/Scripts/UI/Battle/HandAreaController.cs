@@ -31,6 +31,7 @@ namespace ShadowCardSmash.UI.Battle
 
         // 手牌列表
         private List<CardViewController> _handCards = new List<CardViewController>();
+        private List<GameObject> _handCardObjects = new List<GameObject>(); // 用于跟踪所有卡牌对象（包括卡背）
         private CardViewController _hoveredCard;
         private CardViewController _selectedCard;
         private int _selectedHandIndex = -1;
@@ -305,6 +306,8 @@ namespace ShadowCardSmash.UI.Battle
             }
 
             var cardObj = Instantiate(prefab, handContainer);
+            _handCardObjects.Add(cardObj); // 跟踪所有卡牌对象
+
             var cardView = cardObj.GetComponent<CardViewController>();
 
             if (cardView != null)
@@ -331,6 +334,7 @@ namespace ShadowCardSmash.UI.Battle
 
         private void ClearHand()
         {
+            // 取消订阅事件
             foreach (var card in _handCards)
             {
                 if (card != null)
@@ -339,10 +343,20 @@ namespace ShadowCardSmash.UI.Battle
                     card.OnCardHovered -= HandleCardHovered;
                     card.OnCardUnhovered -= HandleCardUnhovered;
                     card.OnCardRightClicked -= HandleCardRightClicked;
-                    Destroy(card.gameObject);
                 }
             }
             _handCards.Clear();
+
+            // 销毁所有卡牌对象（包括卡背）
+            foreach (var cardObj in _handCardObjects)
+            {
+                if (cardObj != null)
+                {
+                    Destroy(cardObj);
+                }
+            }
+            _handCardObjects.Clear();
+
             _selectedCard = null;
             _selectedHandIndex = -1;
             _hoveredCard = null;
