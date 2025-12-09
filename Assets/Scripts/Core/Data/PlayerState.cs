@@ -10,7 +10,7 @@ namespace ShadowCardSmash.Core.Data
     public class PlayerState
     {
         // ========== 游戏常量 ==========
-        public const int MAX_HEALTH = 40;
+        public const int MAX_HEALTH = 30;
         public const int MAX_MANA = 10;
         public const int MAX_HAND_SIZE = 10;
         public const int FIELD_SIZE = 6;
@@ -68,6 +68,25 @@ namespace ShadowCardSmash.Core.Data
         /// 疲劳计数器（每次空牌库抽牌+1）
         /// </summary>
         public int fatigueCounter;
+
+        // ========== 屏障 ==========
+
+        /// <summary>
+        /// 玩家是否拥有屏障（免疫一次伤害）
+        /// </summary>
+        public bool hasBarrier;
+
+        // ========== 自伤统计（吸血鬼职业用）==========
+
+        /// <summary>
+        /// 本回合自伤伤害量
+        /// </summary>
+        public int selfDamageThisTurn;
+
+        /// <summary>
+        /// 游戏中累计自伤伤害量
+        /// </summary>
+        public int totalSelfDamage;
 
         // ========== 卡牌区域 ==========
 
@@ -133,6 +152,9 @@ namespace ShadowCardSmash.Core.Data
                 evolutionPoints = SECOND_PLAYER_EP, // 双方都有3EP，但开放时机不同
                 hasEvolvedThisTurn = false,
                 fatigueCounter = 0,
+                hasBarrier = false,
+                selfDamageThisTurn = 0,
+                totalSelfDamage = 0,
                 deck = new List<int>(deckCardIds),
                 hand = new List<RuntimeCard>(),
                 graveyard = new List<int>(),
@@ -240,9 +262,41 @@ namespace ShadowCardSmash.Core.Data
         /// <summary>
         /// 受到伤害
         /// </summary>
-        public void TakeDamage(int damage)
+        /// <returns>实际受到的伤害</returns>
+        public int TakeDamage(int damage)
         {
+            if (hasBarrier && damage > 0)
+            {
+                hasBarrier = false;
+                UnityEngine.Debug.Log($"PlayerState: 玩家{playerId}的屏障抵挡了{damage}点伤害");
+                return 0;
+            }
             health -= damage;
+            return damage;
+        }
+
+        /// <summary>
+        /// 自伤（吸血鬼职业技能）
+        /// </summary>
+        /// <returns>实际受到的伤害</returns>
+        public int TakeSelfDamage(int damage)
+        {
+            int actualDamage = TakeDamage(damage);
+            if (actualDamage > 0)
+            {
+                selfDamageThisTurn += actualDamage;
+                totalSelfDamage += actualDamage;
+                UnityEngine.Debug.Log($"PlayerState: 玩家{playerId}自伤{actualDamage}点 (本回合:{selfDamageThisTurn}, 累计:{totalSelfDamage})");
+            }
+            return actualDamage;
+        }
+
+        /// <summary>
+        /// 重置回合自伤计数
+        /// </summary>
+        public void ResetTurnSelfDamage()
+        {
+            selfDamageThisTurn = 0;
         }
 
         /// <summary>

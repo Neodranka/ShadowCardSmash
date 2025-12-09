@@ -26,34 +26,22 @@ namespace ShadowCardSmash.UI.Battle
         private HashSet<int> _selectedIndices = new HashSet<int>();
         private ICardDatabase _cardDatabase;
         private int _currentPlayerId;
+        private bool _isShowing = false; // 追踪是否正在显示
 
         public event System.Action<int> OnCardToggled;      // 参数：手牌索引
         public event System.Action OnConfirmClicked;
 
         void Awake()
         {
-            // 注意：不在 Awake 中隐藏面板，因为如果 mulliganPanel 指向自身，
-            // SetActive(false) 会禁用整个组件导致 Show() 无法被调用
-            // 隐藏操作移到 Start 中，或者由外部控制
-
-            if (confirmButton != null)
-            {
-                confirmButton.onClick.AddListener(OnConfirmButtonClicked);
-            }
-        }
-
-        void Start()
-        {
-            // 初始隐藏面板
+            // 在 Awake 中隐藏面板（比 Start 更早执行）
             if (mulliganPanel != null && mulliganPanel != gameObject)
             {
                 mulliganPanel.SetActive(false);
             }
-            else if (mulliganPanel == gameObject)
+
+            if (confirmButton != null)
             {
-                // 如果 mulliganPanel 指向自身，不要在这里隐藏
-                // 让 HotSeatGameManager 控制显示/隐藏
-                Debug.Log("MulliganUI: mulliganPanel 指向自身，由外部控制显示状态");
+                confirmButton.onClick.AddListener(OnConfirmButtonClicked);
             }
         }
 
@@ -70,10 +58,35 @@ namespace ShadowCardSmash.UI.Battle
         /// </summary>
         public void Show(List<RuntimeCard> hand, int playerId, bool isSecondPlayer)
         {
-            if (mulliganPanel == null) return;
+            Debug.Log($"MulliganUI.Show: mulliganPanel={mulliganPanel != null}, cardContainer={cardContainer != null}, hand.Count={hand?.Count ?? 0}");
+
+            if (mulliganPanel == null)
+            {
+                Debug.LogError("MulliganUI.Show: mulliganPanel 为空!");
+                return;
+            }
 
             _currentPlayerId = playerId;
             mulliganPanel.SetActive(true);
+
+            // 输出面板的位置和大小信息，并自动修复大小为0的问题
+            var panelRect = mulliganPanel.GetComponent<RectTransform>();
+            if (panelRect != null)
+            {
+                Debug.Log($"MulliganUI.Show: Panel位置={panelRect.anchoredPosition}, 大小={panelRect.sizeDelta}, anchorMin={panelRect.anchorMin}, anchorMax={panelRect.anchorMax}, active={mulliganPanel.activeInHierarchy}");
+
+                // 如果大小为0，自动设置为拉伸填充父容器
+                if (panelRect.sizeDelta == Vector2.zero)
+                {
+                    Debug.Log("MulliganUI.Show: 检测到面板大小为0，自动拉伸填充");
+                    panelRect.anchorMin = Vector2.zero;
+                    panelRect.anchorMax = Vector2.one;
+                    panelRect.offsetMin = Vector2.zero;
+                    panelRect.offsetMax = Vector2.zero;
+                    Debug.Log($"MulliganUI.Show: 修复后大小={panelRect.rect.size}");
+                }
+            }
+
             _selectedIndices.Clear();
 
             // 清除旧的卡牌视图
@@ -86,6 +99,10 @@ namespace ShadowCardSmash.UI.Battle
             }
             _cardViews.Clear();
 
+            // 如果 cardContainer 为空，尝试使用 mulliganPanel 自身
+            Transform actualContainer = cardContainer != null ? cardContainer : mulliganPanel.transform;
+            Debug.Log($"MulliganUI.Show: 使用容器={actualContainer.name}");
+
             // 创建手牌视图
             for (int i = 0; i < hand.Count; i++)
             {
@@ -95,12 +112,12 @@ namespace ShadowCardSmash.UI.Battle
                 GameObject cardObj;
                 if (mulliganCardPrefab != null)
                 {
-                    cardObj = Instantiate(mulliganCardPrefab, cardContainer);
+                    cardObj = Instantiate(mulliganCardPrefab, actualContainer);
                 }
                 else
                 {
                     // 如果没有预制体，创建简单的占位符
-                    cardObj = CreateSimpleCardView(cardContainer);
+                    cardObj = CreateSimpleCardView(actualContainer);
                 }
 
                 var cardView = cardObj.GetComponent<MulliganCardView>();

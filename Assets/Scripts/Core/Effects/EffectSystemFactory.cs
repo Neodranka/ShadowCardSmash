@@ -47,6 +47,11 @@ namespace ShadowCardSmash.Core.Effects
             effectSystem.RegisterExecutor(EffectType.GainKeyword, new GainKeywordExecutor());
             effectSystem.RegisterExecutor(EffectType.GainCost, new GainManaExecutor());
 
+            // 吸血鬼职业效果
+            effectSystem.RegisterExecutor(EffectType.GainBarrier, new GainBarrierExecutor());
+            effectSystem.RegisterExecutor(EffectType.SelfDamage, new SelfDamageExecutor());
+            effectSystem.RegisterExecutor(EffectType.HealByDamage, new HealByDamageExecutor());
+
             // TODO: 实现更多效果执行器
             // effectSystem.RegisterExecutor(EffectType.AddToHand, new AddToHandExecutor());
             // effectSystem.RegisterExecutor(EffectType.Transform, new TransformExecutor());

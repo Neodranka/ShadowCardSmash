@@ -186,9 +186,15 @@ namespace ShadowCardSmash.Core.Rules
                     var cardToPlay = player.hand[action.handIndex];
                     var cardData = _cardDatabase?.GetCardById(cardToPlay.cardId);
 
-                    // 检查费用
-                    if (cardData != null && cardData.cost > player.mana)
-                        return false;
+                    // 检查费用（考虑增幅费用）
+                    if (cardData != null)
+                    {
+                        int requiredMana = action.useEnhance && cardData.HasEnhance()
+                            ? cardData.enhanceCost
+                            : cardData.cost;
+                        if (requiredMana > player.mana)
+                            return false;
+                    }
 
                     // 检查格子（随从/护符需要）
                     if (cardData != null && (cardData.cardType == CardType.Minion || cardData.cardType == CardType.Amulet))
@@ -251,8 +257,15 @@ namespace ShadowCardSmash.Core.Rules
 
             if (cardData == null) return events;
 
-            // 扣除费用
-            player.mana -= cardData.cost;
+            // 判断是否使用增幅
+            bool useEnhance = action.useEnhance && cardData.HasEnhance();
+
+            // 扣除费用（增幅费用或普通费用）
+            int actualCost = useEnhance ? cardData.enhanceCost : cardData.cost;
+            player.mana -= actualCost;
+
+            // 标记卡牌是否增幅
+            cardInHand.isEnhanced = useEnhance;
 
             // 从手牌移除
             player.hand.RemoveAt(action.handIndex);
@@ -263,7 +276,7 @@ namespace ShadowCardSmash.Core.Rules
                 cardData.cardId,
                 cardInHand.instanceId,
                 action.tileIndex,
-                cardData.cost
+                actualCost
             ));
 
             // 根据卡牌类型处理
@@ -334,6 +347,18 @@ namespace ShadowCardSmash.Core.Rules
                 }
             }
 
+            // 如果使用增幅，执行增幅效果
+            if (runtimeCard.isEnhanced && cardData.enhanceEffects != null)
+            {
+                UnityEngine.Debug.Log($"GameRuleEngine: 执行增幅效果 - {cardData.cardName}");
+                foreach (var effect in cardData.enhanceEffects)
+                {
+                    var effectEvents = _effectSystem.ProcessEffect(
+                        _currentState, runtimeCard, action.playerId, effect, targets);
+                    events.AddRange(effectEvents);
+                }
+            }
+
             // 触发友方/敌方单位入场效果
             var allyPlayEvents = _effectSystem.TriggerEffects(
                 _currentState, EffectTrigger.OnAllyPlay, runtimeCard, action.playerId);
@@ -371,6 +396,18 @@ namespace ShadowCardSmash.Core.Rules
                 if (effect.trigger == EffectTrigger.OnPlay)
                 {
                     // 创建临时上下文处理玩家目标
+                    var effectEvents = _effectSystem.ProcessEffect(
+                        _currentState, null, action.playerId, effect, targets);
+                    events.AddRange(effectEvents);
+                }
+            }
+
+            // 如果使用增幅，执行增幅效果
+            if (cardInHand.isEnhanced && cardData.enhanceEffects != null)
+            {
+                UnityEngine.Debug.Log($"GameRuleEngine: 执行法术增幅效果 - {cardData.cardName}");
+                foreach (var effect in cardData.enhanceEffects)
+                {
                     var effectEvents = _effectSystem.ProcessEffect(
                         _currentState, null, action.playerId, effect, targets);
                     events.AddRange(effectEvents);

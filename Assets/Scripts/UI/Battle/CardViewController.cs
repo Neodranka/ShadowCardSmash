@@ -44,7 +44,8 @@ namespace ShadowCardSmash.UI.Battle
         private RuntimeCard _runtimeCard;
         private int _handIndex = -1;
         private bool _isSelected;
-        private bool _isHovered;
+        // ReSharper disable once NotAccessedField.Local
+        private bool _isHovered; // 保留用于未来扩展（如悬停效果）
         private bool _isPlayable;
 
         // 事件

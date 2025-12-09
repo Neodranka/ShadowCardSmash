@@ -489,4 +489,65 @@ namespace ShadowCardSmash.Core.Events
             this.newMaxMana = newMaxMana;
         }
     }
+
+    /// <summary>
+    /// 获得屏障事件
+    /// </summary>
+    [Serializable]
+    public class BarrierGainedEvent : GameEvent
+    {
+        public int targetId; // 随从instanceId 或 玩家ID
+        public bool isPlayer; // 是否为玩家
+
+        public BarrierGainedEvent() : base() { }
+
+        public BarrierGainedEvent(int sourcePlayerId, int targetId, bool isPlayer)
+            : base(sourcePlayerId)
+        {
+            this.targetId = targetId;
+            this.isPlayer = isPlayer;
+        }
+    }
+
+    /// <summary>
+    /// 屏障消耗事件
+    /// </summary>
+    [Serializable]
+    public class BarrierConsumedEvent : GameEvent
+    {
+        public int targetId;
+        public bool isPlayer;
+        public int damageBlocked;
+
+        public BarrierConsumedEvent() : base() { }
+
+        public BarrierConsumedEvent(int sourcePlayerId, int targetId, bool isPlayer, int damageBlocked)
+            : base(sourcePlayerId)
+        {
+            this.targetId = targetId;
+            this.isPlayer = isPlayer;
+            this.damageBlocked = damageBlocked;
+        }
+    }
+
+    /// <summary>
+    /// 吸血回复事件
+    /// </summary>
+    [Serializable]
+    public class DrainEvent : GameEvent
+    {
+        public int attackerInstanceId;
+        public int damageDealt;
+        public int healedAmount;
+
+        public DrainEvent() : base() { }
+
+        public DrainEvent(int sourcePlayerId, int attackerInstanceId, int damageDealt, int healedAmount)
+            : base(sourcePlayerId)
+        {
+            this.attackerInstanceId = attackerInstanceId;
+            this.damageDealt = damageDealt;
+            this.healedAmount = healedAmount;
+        }
+    }
 }

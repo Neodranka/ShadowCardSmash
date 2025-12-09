@@ -18,7 +18,8 @@ namespace ShadowCardSmash.Core.Data
         Bronze,     // 铜（普通）
         Silver,     // 银（稀有）
         Gold,       // 金（史诗）
-        Legendary   // 彩（传说）
+        Legendary,  // 彩（传说）
+        Token       // 衍生卡
     }
 
     /// <summary>
@@ -27,9 +28,10 @@ namespace ShadowCardSmash.Core.Data
     public enum HeroClass
     {
         Neutral = 0,    // 中立
-        ClassA = 1,     // 职业A
-        ClassB = 2,     // 职业B
-        ClassC = 3      // 职业C
+        Vampire = 1,    // 吸血鬼
+        ClassA = 2,     // 职业A
+        ClassB = 3,     // 职业B
+        ClassC = 4      // 职业C
     }
 
     /// <summary>
@@ -51,9 +53,12 @@ namespace ShadowCardSmash.Core.Data
     /// </summary>
     public enum Keyword
     {
+        None,       // 无
         Ward,       // 守护
         Rush,       // 突进
-        Storm       // 疾驰
+        Storm,      // 疾驰
+        Barrier,    // 屏障（免疫一次伤害）
+        Drain       // 吸血（攻击时回复等量生命）
     }
 
     /// <summary>
@@ -72,7 +77,10 @@ namespace ShadowCardSmash.Core.Data
         OnAllyPlay,         // 友方单位入场时
         OnEnemyPlay,        // 敌方单位入场时
         OnAllyDestroy,      // 友方单位被破坏时
-        OnEnemyDestroy      // 敌方单位被破坏时
+        OnEnemyDestroy,     // 敌方单位被破坏时
+        OnOwnerTurnEnd,     // 自己回合结束时（吸血鬼用）
+        OnMinionDestroyed,  // 任意随从被破坏时
+        OnOwnerDamaged      // 自己玩家受伤时
     }
 
     /// <summary>
@@ -95,7 +103,22 @@ namespace ShadowCardSmash.Core.Data
         Transform,      // 变形
         Evolve,         // 进化
         GainCost,       // 获得费用
-        TileEffect      // 格子效果
+        TileEffect,     // 格子效果
+        GainBarrier,    // 获得屏障
+        SwapHealth,     // 交换生命值
+        EqualizeHealth, // 均衡生命值
+        RandomDamage,   // 随机伤害
+        DamageByCount,  // 根据数量造成伤害
+        HealByDamage,   // 根据伤害量回复
+        SelfDamage,     // 对自己玩家造成伤害
+        Reanimate,      // 复活墓地随从
+        GainStats,      // 获得属性（根据条件）
+        DiscardToGain,  // 弃牌获得效果
+        AddEffect,      // 给目标添加效果
+        KurentiSpecial, // 克伦缇特殊效果
+        DestroyAllOther,// 破坏所有其他随从
+        SelfEvolve,     // 自我进化
+        AddCardToHand   // 添加卡牌到手牌
     }
 
     /// <summary>
@@ -114,7 +137,9 @@ namespace ShadowCardSmash.Core.Data
         PlayerChoice,   // 玩家选择
         EnemyPlayer,    // 敌方玩家
         AllyPlayer,     // 友方玩家
-        AdjacentTiles   // 相邻格子
+        AdjacentTiles,  // 相邻格子
+        All,            // 所有随从+双方玩家
+        SingleMinion    // 单个随从（双方都可选）
     }
 
     /// <summary>

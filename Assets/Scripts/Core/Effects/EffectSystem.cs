@@ -103,6 +103,15 @@ namespace ShadowCardSmash.Core.Effects
                 targets = _targetSelector.SelectTargets(state, source, sourcePlayerId, effect.targetType);
             }
 
+            // 检查条件表达式（新增的condition字段）
+            if (!string.IsNullOrEmpty(effect.condition))
+            {
+                if (!CheckConditionExpression(state, source, sourcePlayerId, effect.condition))
+                {
+                    return events;
+                }
+            }
+
             // 创建上下文
             var context = new EffectContext
             {
@@ -111,6 +120,8 @@ namespace ShadowCardSmash.Core.Effects
                 SourcePlayerId = sourcePlayerId,
                 Targets = targets,
                 Value = effect.value,
+                SecondaryValue = effect.secondaryValue,
+                Condition = effect.condition ?? string.Empty,
                 Parameters = effect.parameters ?? new List<string>(),
                 ResultEvents = events,
                 CardDatabase = _cardDatabase,
@@ -242,6 +253,104 @@ namespace ShadowCardSmash.Core.Effects
             int sourcePlayerId, EffectData effect)
         {
             return _targetSelector.GetValidTargets(state, source, sourcePlayerId, effect.targetType);
+        }
+
+        /// <summary>
+        /// 检查条件表达式
+        /// </summary>
+        private bool CheckConditionExpression(GameState state, RuntimeCard source, int sourcePlayerId, string condition)
+        {
+            if (string.IsNullOrEmpty(condition)) return true;
+
+            var player = state.GetPlayer(sourcePlayerId);
+
+            // 解析简单条件表达式: "variable>=value" 或 "variable<=value"
+            // 支持: total_self_damage>=10, self_damage_this_turn>=5 等
+
+            if (condition.Contains(">="))
+            {
+                var parts = condition.Split(new string[] { ">=" }, System.StringSplitOptions.None);
+                if (parts.Length == 2)
+                {
+                    string varName = parts[0].Trim();
+                    if (int.TryParse(parts[1].Trim(), out int threshold))
+                    {
+                        int varValue = GetConditionVariable(player, varName);
+                        return varValue >= threshold;
+                    }
+                }
+            }
+            else if (condition.Contains("<="))
+            {
+                var parts = condition.Split(new string[] { "<=" }, System.StringSplitOptions.None);
+                if (parts.Length == 2)
+                {
+                    string varName = parts[0].Trim();
+                    if (int.TryParse(parts[1].Trim(), out int threshold))
+                    {
+                        int varValue = GetConditionVariable(player, varName);
+                        return varValue <= threshold;
+                    }
+                }
+            }
+            else if (condition.Contains(">"))
+            {
+                var parts = condition.Split('>');
+                if (parts.Length == 2)
+                {
+                    string varName = parts[0].Trim();
+                    if (int.TryParse(parts[1].Trim(), out int threshold))
+                    {
+                        int varValue = GetConditionVariable(player, varName);
+                        return varValue > threshold;
+                    }
+                }
+            }
+            else if (condition.Contains("<"))
+            {
+                var parts = condition.Split('<');
+                if (parts.Length == 2)
+                {
+                    string varName = parts[0].Trim();
+                    if (int.TryParse(parts[1].Trim(), out int threshold))
+                    {
+                        int varValue = GetConditionVariable(player, varName);
+                        return varValue < threshold;
+                    }
+                }
+            }
+
+            UnityEngine.Debug.LogWarning($"EffectSystem: 无法解析条件表达式: {condition}");
+            return true; // 默认通过
+        }
+
+        /// <summary>
+        /// 获取条件变量的值
+        /// </summary>
+        private int GetConditionVariable(PlayerState player, string varName)
+        {
+            switch (varName)
+            {
+                case "total_self_damage":
+                    return player.totalSelfDamage;
+                case "self_damage_this_turn":
+                    return player.selfDamageThisTurn;
+                case "health":
+                    return player.health;
+                case "max_health":
+                    return player.maxHealth;
+                case "mana":
+                    return player.mana;
+                case "hand_count":
+                    return player.hand.Count;
+                case "deck_count":
+                    return player.deck.Count;
+                case "field_count":
+                    return player.GetEmptyTileCount() == 0 ? PlayerState.FIELD_SIZE : PlayerState.FIELD_SIZE - player.GetEmptyTileCount();
+                default:
+                    UnityEngine.Debug.LogWarning($"EffectSystem: 未知条件变量: {varName}");
+                    return 0;
+            }
         }
     }
 }

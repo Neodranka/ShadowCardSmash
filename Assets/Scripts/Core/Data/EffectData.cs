@@ -40,9 +40,24 @@ namespace ShadowCardSmash.Core.Data
         public int value;
 
         /// <summary>
+        /// 次要数值（如Buff的生命值部分）
+        /// </summary>
+        public int secondaryValue;
+
+        /// <summary>
+        /// 条件表达式（如 "total_self_damage>=10"）
+        /// </summary>
+        public string condition;
+
+        /// <summary>
         /// 额外参数
         /// </summary>
         public List<string> parameters;
+
+        /// <summary>
+        /// 强化时是否替代普通效果
+        /// </summary>
+        public bool overrideNormalEffect;
 
         /// <summary>
         /// 默认构造函数
@@ -52,6 +67,7 @@ namespace ShadowCardSmash.Core.Data
             conditionType = string.Empty;
             conditionParams = new List<string>();
             parameters = new List<string>();
+            condition = string.Empty;
         }
 
         /// <summary>
@@ -63,6 +79,8 @@ namespace ShadowCardSmash.Core.Data
             this.targetType = targetType;
             this.effectType = effectType;
             this.value = value;
+            this.secondaryValue = 0;
+            this.condition = string.Empty;
             this.conditionType = string.Empty;
             this.conditionParams = new List<string>();
             this.parameters = new List<string>();

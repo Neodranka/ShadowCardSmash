@@ -60,7 +60,9 @@ namespace ShadowCardSmash.UI.Battle
 
         // 当前交互状态
         private BattleUIState _currentState = BattleUIState.Idle;
-        private CardViewController _selectedCard;
+        #pragma warning disable CS0414
+        private CardViewController _selectedCard; // 保留用于未来扩展
+        #pragma warning restore CS0414
         private int _selectedHandIndex = -1;
         private TileSlotController _selectedTile;
         private int _selectedAttackerInstanceId = -1;
@@ -318,16 +320,33 @@ namespace ShadowCardSmash.UI.Battle
         /// </summary>
         public void RefreshHand(int playerId)
         {
+            Debug.Log($"BattleUIController.RefreshHand: playerId={playerId}, localPlayerId={_localPlayerId}");
+
             var state = gameController?.CurrentState;
-            if (state == null) return;
+            if (state == null)
+            {
+                Debug.LogError("BattleUIController.RefreshHand: gameController.CurrentState 为空!");
+                return;
+            }
 
             var playerState = state.GetPlayer(playerId);
-            if (playerState == null) return;
+            if (playerState == null)
+            {
+                Debug.LogError($"BattleUIController.RefreshHand: 找不到玩家 {playerId} 的状态!");
+                return;
+            }
+
+            Debug.Log($"BattleUIController.RefreshHand: 玩家{playerId}手牌数={playerState.hand?.Count ?? 0}");
 
             HandAreaController handArea = playerId == _localPlayerId ? myHandArea : opponentHandArea;
             if (handArea != null)
             {
+                Debug.Log($"BattleUIController.RefreshHand: 调用 handArea.SetHand, handArea={handArea.gameObject.name}");
                 handArea.SetHand(playerState.hand);
+            }
+            else
+            {
+                Debug.LogError($"BattleUIController.RefreshHand: handArea 为空! (playerId={playerId}, isLocal={playerId == _localPlayerId})");
             }
         }
 

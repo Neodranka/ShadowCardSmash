@@ -45,6 +45,16 @@ namespace ShadowCardSmash.Core.Effects
         public int Value { get; set; }
 
         /// <summary>
+        /// 次要数值（如Buff的生命值部分）
+        /// </summary>
+        public int SecondaryValue { get; set; }
+
+        /// <summary>
+        /// 条件表达式
+        /// </summary>
+        public string Condition { get; set; }
+
+        /// <summary>
         /// 额外参数
         /// </summary>
         public List<string> Parameters { get; set; }
@@ -74,6 +84,8 @@ namespace ShadowCardSmash.Core.Effects
             ResultEvents = new List<GameEvent>();
             TargetPlayerId = -1;
             TargetIsPlayer = false;
+            SecondaryValue = 0;
+            Condition = string.Empty;
         }
 
         /// <summary>

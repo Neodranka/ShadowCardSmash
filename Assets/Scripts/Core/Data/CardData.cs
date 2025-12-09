@@ -101,6 +101,56 @@ namespace ShadowCardSmash.Core.Data
         /// </summary>
         public List<EffectData> effects;
 
+        // ========== 增幅（Enhance）==========
+
+        /// <summary>
+        /// 增幅费用（0表示无增幅）
+        /// </summary>
+        public int enhanceCost;
+
+        /// <summary>
+        /// 增幅效果列表
+        /// </summary>
+        public List<EffectData> enhanceEffects;
+
+        // ========== 进化效果 ==========
+
+        /// <summary>
+        /// 进化时效果列表
+        /// </summary>
+        public List<EffectData> evolveEffects;
+
+        // ========== 目标选择 ==========
+
+        /// <summary>
+        /// 是否需要选择目标
+        /// </summary>
+        public bool requiresTarget;
+
+        /// <summary>
+        /// 有效目标类型
+        /// </summary>
+        public TargetType validTargets;
+
+        // ========== 关键词 ==========
+
+        /// <summary>
+        /// 关键词列表
+        /// </summary>
+        public List<Keyword> keywords;
+
+        // ========== 特殊标记 ==========
+
+        /// <summary>
+        /// 是否可以用EP进化（默认true）
+        /// </summary>
+        public bool canEvolveWithEP = true;
+
+        /// <summary>
+        /// 是否是衍生卡（TOKEN）
+        /// </summary>
+        public bool isToken;
+
         // ========== 资源引用 ==========
 
         /// <summary>
@@ -122,9 +172,15 @@ namespace ShadowCardSmash.Core.Data
             description = string.Empty;
             tags = new List<string>();
             effects = new List<EffectData>();
+            enhanceEffects = new List<EffectData>();
+            evolveEffects = new List<EffectData>();
+            keywords = new List<Keyword>();
+            enhanceCost = 0;
             artworkPath = string.Empty;
             evolvedArtworkPath = string.Empty;
             countdown = -1; // 默认无倒计时
+            canEvolveWithEP = true;
+            isToken = false;
         }
 
         /// <summary>
@@ -147,6 +203,8 @@ namespace ShadowCardSmash.Core.Data
                 rarity = rarity,
                 tags = new List<string>(),
                 effects = new List<EffectData>(),
+                enhanceEffects = new List<EffectData>(),
+                enhanceCost = 0,
                 countdown = -1
             };
         }
@@ -168,6 +226,8 @@ namespace ShadowCardSmash.Core.Data
                 rarity = rarity,
                 tags = new List<string>(),
                 effects = new List<EffectData>(),
+                enhanceEffects = new List<EffectData>(),
+                enhanceCost = 0,
                 countdown = -1
             };
         }
@@ -188,8 +248,26 @@ namespace ShadowCardSmash.Core.Data
                 heroClass = heroClass,
                 rarity = rarity,
                 tags = new List<string>(),
-                effects = new List<EffectData>()
+                effects = new List<EffectData>(),
+                enhanceEffects = new List<EffectData>(),
+                enhanceCost = 0
             };
+        }
+
+        /// <summary>
+        /// 检查是否有增幅效果
+        /// </summary>
+        public bool HasEnhance()
+        {
+            return enhanceCost > 0 && enhanceEffects != null && enhanceEffects.Count > 0;
+        }
+
+        /// <summary>
+        /// 检查是否可以以增幅费用使用
+        /// </summary>
+        public bool CanEnhance(int availableMana)
+        {
+            return HasEnhance() && availableMana >= enhanceCost;
         }
     }
 }

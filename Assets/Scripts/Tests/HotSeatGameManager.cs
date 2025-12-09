@@ -44,7 +44,9 @@ namespace ShadowCardSmash.Tests
         private int _currentViewingPlayer = 0;
         private bool _isWaitingForSwitch = false;
         private int _currentMulliganPlayer = 0;
-        private bool _isInMulliganPhase = false;
+        #pragma warning disable CS0414
+        private bool _isInMulliganPhase = false; // 保留用于状态追踪
+        #pragma warning restore CS0414
 
         void Start()
         {
@@ -137,14 +139,33 @@ namespace ShadowCardSmash.Tests
                 gameController.OnMulliganPhaseStart += OnMulliganPhaseStart;
                 gameController.OnMulliganPhaseEnd += OnMulliganPhaseEnd;
 
-                // 8. 初始化UI
-                Debug.Log($"Step 8: 初始化UI (battleUI is null: {battleUI == null})");
+                // 8. 初始化UI（先只设置引用，不初始化状态）
+                Debug.Log($"Step 8: 设置UI引用 (battleUI is null: {battleUI == null})");
                 if (battleUI != null)
                 {
                     // 设置 BattleUIController 的 gameController 引用
                     battleUI.gameController = gameController;
-                    battleUI.Initialize(_cardDatabase, _currentViewingPlayer);
-                    Debug.Log("  BattleUIController 初始化完成");
+
+                    // 提前设置 CardListPopup 的卡牌数据库（这样在 Mulligan 阶段也可以查看牌库）
+                    if (battleUI.cardListPopup != null)
+                    {
+                        battleUI.cardListPopup.SetCardDatabase(_cardDatabase);
+                        Debug.Log("  CardListPopup 卡牌数据库已设置");
+                    }
+
+                    // 提前设置 HandAreaController 的卡牌数据库
+                    if (battleUI.myHandArea != null)
+                    {
+                        battleUI.myHandArea.SetCardDatabase(_cardDatabase);
+                        Debug.Log("  myHandArea 卡牌数据库已设置");
+                    }
+                    if (battleUI.opponentHandArea != null)
+                    {
+                        battleUI.opponentHandArea.SetCardDatabase(_cardDatabase);
+                        Debug.Log("  opponentHandArea 卡牌数据库已设置");
+                    }
+
+                    Debug.Log("  BattleUIController gameController 引用已设置");
                 }
                 else
                 {
@@ -160,12 +181,30 @@ namespace ShadowCardSmash.Tests
                     Debug.Log("  MulliganUI 初始化完成");
                 }
 
-                // 9. 开始游戏（会自动触发 UI 刷新）
+                // 9. 开始游戏（会自动触发 Mulligan 或直接开始）
                 Debug.Log("Step 9: 开始游戏");
                 gameController.StartGame();
 
+                // 10. 刷新牌库和墓地显示（在 Mulligan 阶段也需要显示）
+                if (battleUI != null)
+                {
+                    // 手动刷新牌库显示
+                    var state = gameController.CurrentState;
+                    if (state != null && battleUI.myDeckPile != null)
+                    {
+                        battleUI.myDeckPile.UpdateCount(state.players[0]?.deck?.Count ?? 0);
+                        Debug.Log($"  P0 牌库数量已更新: {state.players[0]?.deck?.Count ?? 0}");
+                    }
+                    if (state != null && battleUI.opponentDeckPile != null)
+                    {
+                        battleUI.opponentDeckPile.UpdateCount(state.players[1]?.deck?.Count ?? 0);
+                        Debug.Log($"  P1 牌库数量已更新: {state.players[1]?.deck?.Count ?? 0}");
+                    }
+                }
+
                 Debug.Log($"=== HotSeatGameManager: 游戏初始化完成 ===");
                 Debug.Log($"  种子={seed}，先手玩家={gameController.CurrentState?.currentPlayerId}");
+                Debug.Log($"  游戏阶段={gameController.CurrentState?.phase}");
                 Debug.Log($"  P0 手牌: {gameController.CurrentState?.players[0]?.hand?.Count}");
                 Debug.Log($"  P1 手牌: {gameController.CurrentState?.players[1]?.hand?.Count}");
             }
@@ -365,12 +404,12 @@ namespace ShadowCardSmash.Tests
 
         void OnMulliganPhaseStart()
         {
-            Debug.Log("HotSeatGameManager: 进入换牌阶段");
+            Debug.Log($"HotSeatGameManager: 进入换牌阶段, skipMulligan={skipMulligan}, mulliganUI={mulliganUI != null}");
 
-            if (skipMulligan)
+            if (skipMulligan || mulliganUI == null)
             {
                 // 跳过换牌阶段
-                Debug.Log("HotSeatGameManager: 跳过换牌阶段");
+                Debug.Log("HotSeatGameManager: 跳过换牌阶段（skipMulligan或mulliganUI为空）");
                 gameController.ConfirmMulligan(0);
                 gameController.ConfirmMulligan(1);
                 return;
@@ -383,7 +422,7 @@ namespace ShadowCardSmash.Tests
 
         void OnMulliganPhaseEnd()
         {
-            Debug.Log("HotSeatGameManager: 换牌阶段结束");
+            Debug.Log($"HotSeatGameManager: 换牌阶段结束, currentPlayerId={gameController.CurrentState?.currentPlayerId}, IsMyTurn={gameController.IsMyTurn}");
             _isInMulliganPhase = false;
 
             if (mulliganUI != null)
@@ -391,12 +430,36 @@ namespace ShadowCardSmash.Tests
                 mulliganUI.Hide();
             }
 
+            // 更新当前观看的玩家为当前回合的玩家（先手玩家0）
+            _currentViewingPlayer = gameController.CurrentState?.currentPlayerId ?? 0;
+            gameController.SetControlledPlayer(_currentViewingPlayer);
+
             // 初始化战斗UI
             if (battleUI != null)
             {
+                Debug.Log($"HotSeatGameManager: 初始化战斗UI...");
+                Debug.Log($"  battleUI.myHandArea = {battleUI.myHandArea != null}");
+                Debug.Log($"  battleUI.opponentHandArea = {battleUI.opponentHandArea != null}");
+                if (battleUI.myHandArea != null)
+                {
+                    Debug.Log($"  myHandArea.cardPrefab = {battleUI.myHandArea.cardPrefab != null}");
+                    Debug.Log($"  myHandArea.handContainer = {battleUI.myHandArea.handContainer != null}");
+                }
+
                 battleUI.Initialize(_cardDatabase, _currentViewingPlayer);
-                battleUI.SetMyTurn(gameController.IsMyTurn);
+                battleUI.SetMyTurn(true); // Mulligan结束后一定是先手玩家的回合
                 battleUI.RefreshAllUI();
+
+                // 验证手牌数量
+                var p0Hand = gameController.CurrentState?.players[0]?.hand;
+                var p1Hand = gameController.CurrentState?.players[1]?.hand;
+                Debug.Log($"HotSeatGameManager: 战斗UI初始化完成，玩家{_currentViewingPlayer}的回合");
+                Debug.Log($"  P0 手牌数: {p0Hand?.Count ?? 0}");
+                Debug.Log($"  P1 手牌数: {p1Hand?.Count ?? 0}");
+            }
+            else
+            {
+                Debug.LogError("HotSeatGameManager: battleUI 为空!");
             }
         }
 

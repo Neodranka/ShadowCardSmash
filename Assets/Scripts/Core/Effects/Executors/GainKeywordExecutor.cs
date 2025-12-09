@@ -81,6 +81,30 @@ namespace ShadowCardSmash.Core.Effects.Executors
                             ));
                         }
                         break;
+
+                    case Keyword.Barrier:
+                        if (!target.hasBarrier)
+                        {
+                            target.hasBarrier = true;
+                            context.AddEvent(new KeywordGainedEvent(
+                                context.SourcePlayerId,
+                                target.instanceId,
+                                Keyword.Barrier
+                            ));
+                        }
+                        break;
+
+                    case Keyword.Drain:
+                        if (!target.hasDrain)
+                        {
+                            target.hasDrain = true;
+                            context.AddEvent(new KeywordGainedEvent(
+                                context.SourcePlayerId,
+                                target.instanceId,
+                                Keyword.Drain
+                            ));
+                        }
+                        break;
                 }
             }
         }

@@ -32,7 +32,9 @@ namespace ShadowCardSmash.UI.Battle
         private CardViewController _currentOccupant;
         private bool _isValidTarget;
         private bool _isValidPlacement;
-        private bool _isHovered;
+        #pragma warning disable CS0414
+        private bool _isHovered; // 保留用于未来扩展
+        #pragma warning restore CS0414
 
         // 事件
         public event Action<TileSlotController> OnTileClicked;

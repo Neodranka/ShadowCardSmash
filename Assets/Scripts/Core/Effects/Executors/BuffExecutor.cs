@@ -42,9 +42,10 @@ namespace ShadowCardSmash.Core.Effects.Executors
             }
             else
             {
-                // 如果没有参数，使用Value作为增益值
+                // 如果没有参数，使用Value作为攻击增益值，SecondaryValue作为生命增益
                 attackMod = context.Value;
-                healthMod = context.Value;
+                // 如果SecondaryValue不为0，使用它作为生命值增益，否则与攻击相同
+                healthMod = context.SecondaryValue != 0 ? context.SecondaryValue : context.Value;
             }
 
             int sourceCardId = context.Source?.cardId ?? -1;

@@ -48,34 +48,62 @@ namespace ShadowCardSmash.Core.Rules
             int defenderDamage = defender.currentAttack;
 
             // 攻击者对防守者造成伤害
-            defender.TakeDamage(attackerDamage);
+            int actualAttackerDamage = defender.TakeDamage(attackerDamage);
             events.Add(new DamageEvent(
                 attackerPlayerId,
                 attacker.instanceId,
                 defender.instanceId,
-                attackerDamage,
+                actualAttackerDamage,
                 false,
                 -1
             ));
 
+            // 吸血效果：攻击者造成伤害后回复玩家生命
+            if (attacker.hasDrain && actualAttackerDamage > 0 && !attacker.isSilenced)
+            {
+                var attackerOwner = state.GetPlayer(attackerPlayerId);
+                attackerOwner.Heal(actualAttackerDamage);
+                events.Add(new DrainEvent(
+                    attackerPlayerId,
+                    attacker.instanceId,
+                    actualAttackerDamage,
+                    actualAttackerDamage
+                ));
+                UnityEngine.Debug.Log($"CombatResolver: 吸血效果 - 玩家{attackerPlayerId}回复{actualAttackerDamage}生命");
+            }
+
             // 防守者对攻击者造成伤害（反击）
-            attacker.TakeDamage(defenderDamage);
+            int actualDefenderDamage = attacker.TakeDamage(defenderDamage);
             events.Add(new DamageEvent(
                 defender.ownerId,
                 defender.instanceId,
                 attacker.instanceId,
-                defenderDamage,
+                actualDefenderDamage,
                 false,
                 -1
             ));
 
-            // 触发受伤效果
-            if (!attacker.isSilenced && defenderDamage > 0)
+            // 防守者的吸血效果
+            if (defender.hasDrain && actualDefenderDamage > 0 && !defender.isSilenced)
+            {
+                var defenderOwner = state.GetPlayer(defender.ownerId);
+                defenderOwner.Heal(actualDefenderDamage);
+                events.Add(new DrainEvent(
+                    defender.ownerId,
+                    defender.instanceId,
+                    actualDefenderDamage,
+                    actualDefenderDamage
+                ));
+                UnityEngine.Debug.Log($"CombatResolver: 吸血效果 - 玩家{defender.ownerId}回复{actualDefenderDamage}生命");
+            }
+
+            // 触发受伤效果（只有实际受到伤害才触发）
+            if (!attacker.isSilenced && actualDefenderDamage > 0)
             {
                 var damagedEvents = _effectSystem.TriggerEffects(state, EffectTrigger.OnDamaged, attacker, attackerPlayerId);
                 events.AddRange(damagedEvents);
             }
-            if (!defender.isSilenced && attackerDamage > 0)
+            if (!defender.isSilenced && actualAttackerDamage > 0)
             {
                 var damagedEvents = _effectSystem.TriggerEffects(state, EffectTrigger.OnDamaged, defender, defender.ownerId);
                 events.AddRange(damagedEvents);
@@ -119,16 +147,30 @@ namespace ShadowCardSmash.Core.Rules
 
             // 对玩家造成伤害
             int damage = attacker.currentAttack;
-            targetPlayer.TakeDamage(damage);
+            int actualDamage = targetPlayer.TakeDamage(damage);
 
             events.Add(new DamageEvent(
                 attackerPlayerId,
                 attacker.instanceId,
                 -1,
-                damage,
+                actualDamage,
                 true,
                 targetPlayerId
             ));
+
+            // 吸血效果：攻击者造成伤害后回复玩家生命
+            if (attacker.hasDrain && actualDamage > 0 && !attacker.isSilenced)
+            {
+                var attackerOwner = state.GetPlayer(attackerPlayerId);
+                attackerOwner.Heal(actualDamage);
+                events.Add(new DrainEvent(
+                    attackerPlayerId,
+                    attacker.instanceId,
+                    actualDamage,
+                    actualDamage
+                ));
+                UnityEngine.Debug.Log($"CombatResolver: 吸血效果 - 玩家{attackerPlayerId}回复{actualDamage}生命");
+            }
 
             // 设置攻击者状态
             attacker.attackedThisTurn = true;

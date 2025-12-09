@@ -53,6 +53,9 @@ namespace ShadowCardSmash.Core.Rules
             // 重置进化标记
             player.hasEvolvedThisTurn = false;
 
+            // 重置回合自伤计数
+            player.ResetTurnSelfDamage();
+
             // 重置所有随从的攻击状态
             foreach (var tile in player.field)
             {

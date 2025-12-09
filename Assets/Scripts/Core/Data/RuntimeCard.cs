@@ -67,6 +67,11 @@ namespace ShadowCardSmash.Core.Data
         public bool isSilenced;
 
         /// <summary>
+        /// 是否以增幅费用使用
+        /// </summary>
+        public bool isEnhanced;
+
+        /// <summary>
         /// 当前倒计时（护符用）
         /// </summary>
         public int currentCountdown;
@@ -87,6 +92,16 @@ namespace ShadowCardSmash.Core.Data
         /// 是否有疾驰
         /// </summary>
         public bool hasStorm;
+
+        /// <summary>
+        /// 是否有屏障（免疫一次伤害）
+        /// </summary>
+        public bool hasBarrier;
+
+        /// <summary>
+        /// 是否有吸血
+        /// </summary>
+        public bool hasDrain;
 
         // ========== Buff列表 ==========
 
@@ -121,10 +136,13 @@ namespace ShadowCardSmash.Core.Data
                 attackedThisTurn = false,
                 summonedThisTurn = true, // 入场当回合
                 isSilenced = false,
+                isEnhanced = false,
                 currentCountdown = cardData.countdown,
                 hasWard = false,
                 hasRush = false,
                 hasStorm = false,
+                hasBarrier = false,
+                hasDrain = false,
                 buffs = new List<BuffData>()
             };
 
@@ -146,9 +164,17 @@ namespace ShadowCardSmash.Core.Data
         /// <summary>
         /// 应用伤害
         /// </summary>
-        public void TakeDamage(int damage)
+        /// <returns>实际受到的伤害</returns>
+        public int TakeDamage(int damage)
         {
+            if (hasBarrier && damage > 0)
+            {
+                hasBarrier = false;
+                UnityEngine.Debug.Log($"RuntimeCard: 单位{instanceId}的屏障抵挡了{damage}点伤害");
+                return 0;
+            }
             currentHealth -= damage;
+            return damage;
         }
 
         /// <summary>
@@ -214,6 +240,8 @@ namespace ShadowCardSmash.Core.Data
             hasWard = false;
             hasRush = false;
             hasStorm = false;
+            hasBarrier = false;
+            hasDrain = false;
             // 注意：Buff数值保留，但关键词Buff的效果被移除
         }
     }

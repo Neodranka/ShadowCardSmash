@@ -49,6 +49,11 @@ namespace ShadowCardSmash.Core.Rules
         /// </summary>
         public int targetPlayerId;
 
+        /// <summary>
+        /// 是否使用增幅效果（PlayCard时使用）
+        /// </summary>
+        public bool useEnhance;
+
         public PlayerAction()
         {
             handIndex = -1;
@@ -62,7 +67,7 @@ namespace ShadowCardSmash.Core.Rules
         /// 创建使用卡牌操作
         /// </summary>
         public static PlayerAction CreatePlayCard(int playerId, int handIndex, int tileIndex,
-            int targetInstanceId = -1, bool targetIsPlayer = false, int targetPlayerId = -1)
+            int targetInstanceId = -1, bool targetIsPlayer = false, int targetPlayerId = -1, bool useEnhance = false)
         {
             return new PlayerAction
             {
@@ -72,7 +77,8 @@ namespace ShadowCardSmash.Core.Rules
                 tileIndex = tileIndex,
                 targetInstanceId = targetInstanceId,
                 targetIsPlayer = targetIsPlayer,
-                targetPlayerId = targetPlayerId
+                targetPlayerId = targetPlayerId,
+                useEnhance = useEnhance
             };
         }
 
