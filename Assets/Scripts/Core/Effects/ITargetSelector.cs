@@ -142,6 +142,7 @@ namespace ShadowCardSmash.Core.Effects
                 case TargetType.SingleEnemyOrPlayer:
                 case TargetType.SingleAlly:
                 case TargetType.PlayerChoice:
+                case TargetType.HandCard:
                     return true;
                 default:
                     return false;
@@ -185,6 +186,18 @@ namespace ShadowCardSmash.Core.Effects
                     // 所有场上单位都可选
                     targets.AddRange(sourcePlayer.GetAllFieldUnits());
                     targets.AddRange(opponentPlayer.GetAllFieldUnits());
+                    break;
+
+                case TargetType.HandCard:
+                    // 己方手牌（用于军需官等选择手牌的效果）
+                    foreach (var card in sourcePlayer.hand)
+                    {
+                        // 不能选择自己（如果source在手牌中）
+                        if (source == null || card.instanceId != source.instanceId)
+                        {
+                            targets.Add(card);
+                        }
+                    }
                     break;
 
                 default:

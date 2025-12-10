@@ -97,6 +97,31 @@ namespace ShadowCardSmash.Core.Effects.Executors
                         false,
                         false
                     ));
+
+                    // 触发抽牌效果（公会总管等）- 只在不是 single_trigger 模式下每张牌触发
+                    // 如果是 single_trigger，会在循环结束后统一触发一次
+                    bool isSingleTrigger = context.Parameters?.Contains("single_trigger") ?? false;
+                    if (!isSingleTrigger && context.EffectSystem != null)
+                    {
+                        var drawTriggerEvents = context.EffectSystem.TriggerEffects(
+                            context.GameState, EffectTrigger.OnDraw, null, context.SourcePlayerId);
+                        foreach (var evt in drawTriggerEvents)
+                        {
+                            context.AddEvent(evt);
+                        }
+                    }
+                }
+            }
+
+            // 如果是 single_trigger 模式（如"抽2张牌"），只触发一次OnDraw
+            bool wasSingleTrigger = context.Parameters?.Contains("single_trigger") ?? false;
+            if (wasSingleTrigger && context.EffectSystem != null)
+            {
+                var drawTriggerEvents = context.EffectSystem.TriggerEffects(
+                    context.GameState, EffectTrigger.OnDraw, null, context.SourcePlayerId);
+                foreach (var evt in drawTriggerEvents)
+                {
+                    context.AddEvent(evt);
                 }
             }
         }

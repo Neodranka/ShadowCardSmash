@@ -90,7 +90,8 @@ namespace ShadowCardSmash.Core.Effects
         /// 处理单个效果（支持玩家作为目标）
         /// </summary>
         public List<GameEvent> ProcessEffectWithPlayerTarget(GameState state, RuntimeCard source, int sourcePlayerId,
-            EffectData effect, List<RuntimeCard> chosenTargets, bool actionTargetIsPlayer, int actionTargetPlayerId)
+            EffectData effect, List<RuntimeCard> chosenTargets, bool actionTargetIsPlayer, int actionTargetPlayerId,
+            List<int> selectedTileIndices = null)
         {
             var events = new List<GameEvent>();
 
@@ -134,7 +135,9 @@ namespace ShadowCardSmash.Core.Effects
                 Parameters = effect.parameters ?? new List<string>(),
                 ResultEvents = events,
                 CardDatabase = _cardDatabase,
-                GenerateInstanceId = _instanceIdGenerator
+                GenerateInstanceId = _instanceIdGenerator,
+                EffectSystem = this,
+                SelectedTileIndices = selectedTileIndices
             };
 
             // 处理玩家目标
@@ -284,6 +287,10 @@ namespace ShadowCardSmash.Core.Effects
                     // 敌方单位被破坏时触发
                     return listenerPlayerId != triggerPlayerId;
 
+                case EffectTrigger.OnDraw:
+                    // 抽牌时触发（只对抽牌玩家的己方单位触发）
+                    return listenerPlayerId == triggerPlayerId;
+
                 default:
                     return true;
             }
@@ -359,6 +366,16 @@ namespace ShadowCardSmash.Core.Effects
                 case "is_my_turn":
                 case "is_own_turn":
                     return state.currentPlayerId == sourcePlayerId;
+                case "has_other_minions":
+                    // 检查场上是否有其他随从（排除自己）
+                    foreach (var tile in player.field)
+                    {
+                        if (tile.occupant != null && (source == null || tile.occupant.instanceId != source.instanceId))
+                        {
+                            return true;
+                        }
+                    }
+                    return false;
             }
 
             // 解析简单条件表达式: "variable>=value" 或 "variable<=value"

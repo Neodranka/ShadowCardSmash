@@ -24,6 +24,9 @@ namespace ShadowCardSmash.Tests
             // 注册吸血鬼卡牌（包括普通卡和衍生卡）
             VampireCards.RegisterToDatabase(_cards);
 
+            // 注册中立卡牌（包括普通卡和衍生卡）
+            NeutralCards.RegisterToDatabase(_cards);
+
             Debug.Log($"TestCardDatabase: 初始化了 {_cards.Count} 张卡牌");
         }
 
@@ -62,14 +65,15 @@ namespace ShadowCardSmash.Tests
         }
 
         /// <summary>
-        /// 创建吸血鬼测试牌库（40张牌）
+        /// 创建吸血鬼+中立测试牌库（40张牌）
         /// </summary>
         public List<int> CreateTestDeck()
         {
             var deck = new List<int>();
 
-            // 铜卡 x3 each = 15张
-            for (int i = 0; i < 3; i++)
+            // === 吸血鬼卡 (20张) ===
+            // 铜卡 x2 each = 10张
+            for (int i = 0; i < 2; i++)
             {
                 deck.Add(2001); // 卖血者
                 deck.Add(2002); // 血刺
@@ -78,32 +82,50 @@ namespace ShadowCardSmash.Tests
                 deck.Add(2005); // 饥饿的捕食者
             }
 
-            // 银卡 x3 each = 15张
-            for (int i = 0; i < 3; i++)
+            // 银卡 x2 each = 6张
+            for (int i = 0; i < 2; i++)
             {
                 deck.Add(2006); // 以伤换命
                 deck.Add(2007); // 血扇
                 deck.Add(2008); // 鲜血狂信徒
-                deck.Add(2009); // 鲜血执行者
-                deck.Add(2010); // 渴血符文
             }
 
-            // 金卡 x2 each = 6张
+            // 金卡 x2 each = 4张
             for (int i = 0; i < 2; i++)
             {
                 deck.Add(2011); // 渴血的狂人
-                deck.Add(2012); // 克伦缇
                 deck.Add(2013); // 鲜血魔像
             }
 
-            // 彩卡 x2 each = 4张
-            for (int i = 0; i < 2; i++)
+            // === 中立卡 (20张) ===
+            // 铜卡 x3 each = 12张
+            for (int i = 0; i < 3; i++)
             {
-                deck.Add(2014); // 利维耶
-                deck.Add(2016); // 鲜血祭司
+                deck.Add(3001); // 胆怯的新兵
+                deck.Add(3002); // 防卫队长
+                deck.Add(3003); // 新晋骑士
+                deck.Add(3004); // 小镇草药师
             }
 
-            // 总共 40 张
+            // 银卡 x2 each = 6张
+            for (int i = 0; i < 2; i++)
+            {
+                deck.Add(3005); // 调整呼吸
+                deck.Add(3006); // 军需官
+                deck.Add(3007); // 倾盆大雨
+            }
+
+            // 金卡 x1 each = 2张
+            deck.Add(3008); // 公会总管
+            deck.Add(3009); // 爆破专家
+
+            // 彩卡 x3 = 3张
+            for (int i = 0; i < 3; i++)
+            {
+                deck.Add(3010); // 唐突的集结
+            }
+
+            // 总共 43 张
             return deck;
         }
 

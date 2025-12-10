@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using ShadowCardSmash.Core.Data;
 
 namespace ShadowCardSmash.Core.Rules
@@ -54,11 +55,22 @@ namespace ShadowCardSmash.Core.Rules
         /// </summary>
         public bool useEnhance;
 
+        /// <summary>
+        /// 选择的手牌目标索引（用于军需官等需要选择手牌的卡牌）
+        /// </summary>
+        public int handCardTargetIndex;
+
+        /// <summary>
+        /// 选择的地格索引列表（用于倾盆大雨等需要选择多个地格的卡牌）
+        /// </summary>
+        public List<int> selectedTileIndices;
+
         public PlayerAction()
         {
             handIndex = -1;
             tileIndex = -1;
             sourceInstanceId = -1;
+            handCardTargetIndex = -1;
             targetInstanceId = -1;
             targetPlayerId = -1;
         }
@@ -67,7 +79,8 @@ namespace ShadowCardSmash.Core.Rules
         /// 创建使用卡牌操作
         /// </summary>
         public static PlayerAction CreatePlayCard(int playerId, int handIndex, int tileIndex,
-            int targetInstanceId = -1, bool targetIsPlayer = false, int targetPlayerId = -1, bool useEnhance = false)
+            int targetInstanceId = -1, bool targetIsPlayer = false, int targetPlayerId = -1,
+            bool useEnhance = false, int handCardTargetIndex = -1, List<int> selectedTileIndices = null)
         {
             return new PlayerAction
             {
@@ -78,7 +91,9 @@ namespace ShadowCardSmash.Core.Rules
                 targetInstanceId = targetInstanceId,
                 targetIsPlayer = targetIsPlayer,
                 targetPlayerId = targetPlayerId,
-                useEnhance = useEnhance
+                useEnhance = useEnhance,
+                handCardTargetIndex = handCardTargetIndex,
+                selectedTileIndices = selectedTileIndices
             };
         }
 

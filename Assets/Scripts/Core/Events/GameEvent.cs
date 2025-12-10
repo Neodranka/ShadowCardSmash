@@ -550,4 +550,32 @@ namespace ShadowCardSmash.Core.Events
             this.healedAmount = healedAmount;
         }
     }
+
+    /// <summary>
+    /// 地格效果触发事件
+    /// </summary>
+    [Serializable]
+    public class TileEffectTriggeredEvent : GameEvent
+    {
+        public int tileOwnerPlayerId;
+        public int tileIndex;
+        public TileEffectType effectType;
+        public int targetInstanceId;
+        public int attackChange;
+        public int healthChange;
+
+        public TileEffectTriggeredEvent() : base() { }
+
+        public TileEffectTriggeredEvent(int sourcePlayerId, int tileOwnerPlayerId, int tileIndex,
+            TileEffectType effectType, int targetInstanceId, int attackChange, int healthChange)
+            : base(sourcePlayerId)
+        {
+            this.tileOwnerPlayerId = tileOwnerPlayerId;
+            this.tileIndex = tileIndex;
+            this.effectType = effectType;
+            this.targetInstanceId = targetInstanceId;
+            this.attackChange = attackChange;
+            this.healthChange = healthChange;
+        }
+    }
 }

@@ -44,6 +44,9 @@ namespace ShadowCardSmash.UI.Battle
         public CardDetailPopup cardDetailPopup;
         public CardListPopup cardListPopup;
 
+        [Header("Hand Card Selection")]
+        public HandCardSelectionUI handCardSelectionUI;
+
         [Header("Turn Indicator")]
         public GameObject myTurnIndicator;
         public TextMeshProUGUI turnNumberText;
@@ -70,6 +73,21 @@ namespace ShadowCardSmash.UI.Battle
         // 有效目标列表
         private List<int> _validTargetInstanceIds = new List<int>();
         private List<int> _validTileIndices = new List<int>();
+
+        // 手牌选择回调
+        private System.Action<int> _handCardSelectionCallback;
+        private System.Action _handCardSelectionCancelCallback;
+
+        // 多选地格相关
+        private List<int> _selectedTileIndices = new List<int>();
+        private int _requiredTileCount = 0;
+        private bool _selectingEnemyTiles = false;
+        private System.Action<List<int>> _tileSelectionCallback;
+
+        // 目标选择相关（爆破专家等需要选择目标的卡牌）
+        private int _pendingCardHandIndex = -1;
+        private int _pendingCardTileIndex = -1;
+        private bool _pendingUseEnhance = false;
 
         // 属性
         public BattleUIState CurrentState => _currentState;
@@ -135,6 +153,13 @@ namespace ShadowCardSmash.UI.Battle
                 gameController.OnTurnChanged -= OnTurnChanged;
                 gameController.OnGameOver -= OnGameOver;
             }
+
+            // 取消手牌选择UI事件
+            if (handCardSelectionUI != null)
+            {
+                handCardSelectionUI.OnCardSelected -= OnHandCardSelected;
+                handCardSelectionUI.OnCancelled -= OnHandCardSelectionCancelled;
+            }
         }
 
         #region Initialization
@@ -163,6 +188,27 @@ namespace ShadowCardSmash.UI.Battle
             if (cardListPopup != null)
             {
                 cardListPopup.SetCardDatabase(cardDatabase);
+            }
+
+            // 设置手牌选择UI的数据库引用
+            // 如果未设置，尝试自动查找
+            if (handCardSelectionUI == null)
+            {
+                handCardSelectionUI = FindObjectOfType<HandCardSelectionUI>(true);
+                if (handCardSelectionUI != null)
+                {
+                    Debug.Log("BattleUIController: 自动找到 HandCardSelectionUI");
+                }
+            }
+            if (handCardSelectionUI != null)
+            {
+                handCardSelectionUI.SetCardDatabase(cardDatabase);
+                handCardSelectionUI.OnCardSelected += OnHandCardSelected;
+                handCardSelectionUI.OnCancelled += OnHandCardSelectionCancelled;
+            }
+            else
+            {
+                Debug.LogWarning("BattleUIController: HandCardSelectionUI 未找到，手牌选择功能将不可用");
             }
 
             // 初始化格子索引
@@ -295,6 +341,11 @@ namespace ShadowCardSmash.UI.Battle
             {
                 HighlightPlayableCards();
             }
+            else
+            {
+                // 不是我的回合时清除所有高亮
+                ClearAllHighlights();
+            }
         }
 
         /// <summary>
@@ -395,6 +446,9 @@ namespace ShadowCardSmash.UI.Battle
                         tile.PlaceUnit(cardView);
                     }
                 }
+
+                // 更新地格效果显示
+                tile.UpdateTileEffectDisplay(tileState);
 
                 // 清除高亮
                 tile.ClearHighlights();
@@ -694,6 +748,11 @@ namespace ShadowCardSmash.UI.Battle
                         CancelCurrentAction();
                     }
                     break;
+
+                case BattleUIState.SelectingMultipleTiles:
+                    // 多选地格（倾盆大雨等）
+                    HandleMultipleTileSelection(tile);
+                    break;
             }
         }
 
@@ -883,6 +942,108 @@ namespace ShadowCardSmash.UI.Battle
             // 判断是否可以使用强化（费用足够且有强化效果）
             bool useEnhance = cardData.HasEnhance() && myState.mana >= cardData.enhanceCost;
 
+            // 检查是否需要选择手牌（军需官、饥饿的捕食者等）
+            // 情况1: validTargets == HandCard
+            // 情况2: 有 DiscardToGain 效果
+            bool needsHandCardSelection = cardData.validTargets == TargetType.HandCard ||
+                                          RequiresHandCardDiscard(cardData);
+
+            if (needsHandCardSelection)
+            {
+                int placementTileIndex = cardData.cardType == CardType.Spell ? 0 : tile.tileIndex;
+                int excludeInstanceId = card.instanceId;
+                int capturedHandIndex = _selectedHandIndex; // 捕获当前选中的手牌索引
+                bool capturedUseEnhance = useEnhance;
+
+                // 获取过滤器（如果是 DiscardToGain 效果，检查是否需要过滤随从）
+                Func<RuntimeCard, bool> filter = GetHandCardFilter(cardData);
+                string title = cardData.validTargets == TargetType.HandCard ? "选择手牌" : "选择要丢弃的手牌";
+
+                ShowHandCardSelection(
+                    title,
+                    cardData.description,
+                    filter,
+                    excludeInstanceId,
+                    (selectedHandIndex) => {
+                        // 选择完成后执行卡牌
+                        bool success = gameController.TryPlayCard(capturedHandIndex, placementTileIndex, -1, false, -1, capturedUseEnhance, selectedHandIndex);
+                        if (success)
+                        {
+                            Debug.Log($"BattleUIController: 打出卡牌 {cardData.cardName}，选择手牌 {selectedHandIndex}");
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"BattleUIController: 打出卡牌失败");
+                        }
+                        CancelCurrentAction();
+                    },
+                    () => {
+                        // 取消选择
+                        Debug.Log("BattleUIController: 取消手牌选择");
+                        CancelCurrentAction();
+                    }
+                );
+                return;
+            }
+
+            // 检查是否需要选择敌方地格（倾盆大雨等）
+            if (cardData.cardType == CardType.Spell && RequiresTileSelection(cardData))
+            {
+                int capturedHandIndex = _selectedHandIndex;
+                bool capturedUseEnhance = useEnhance;
+                int tileCount = GetRequiredTileCount(cardData);
+
+                StartMultipleTileSelection(tileCount, true, (selectedTiles) => {
+                    // 选择完成后执行法术，将选择的地格索引传递给执行器
+                    bool success = gameController.TryPlayCard(capturedHandIndex, 0, -1, false, -1, capturedUseEnhance, -1, selectedTiles);
+
+                    if (success)
+                    {
+                        Debug.Log($"BattleUIController: 释放法术 {cardData.cardName}，选择了{selectedTiles.Count}个地格");
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"BattleUIController: 打出法术失败");
+                    }
+                });
+                return;
+            }
+
+            // 检查是否需要选择目标（爆破专家等）
+            if (cardData.requiresTarget && cardData.validTargets != TargetType.HandCard)
+            {
+                // 需要选择随从目标
+                int placementTileIndex = cardData.cardType == CardType.Spell ? 0 : tile.tileIndex;
+                int capturedHandIndex = _selectedHandIndex;
+                bool capturedUseEnhance = useEnhance;
+
+                // 获取有效目标
+                var validTargets = gameController.GetValidTargetsForCard(capturedHandIndex);
+                if (validTargets == null || validTargets.Count == 0)
+                {
+                    // 没有有效目标，但仍然可以打出卡牌（效果不触发）
+                    bool playResult = gameController.TryPlayCard(capturedHandIndex, placementTileIndex, -1, false, -1, capturedUseEnhance);
+                    if (playResult)
+                    {
+                        Debug.Log($"BattleUIController: 打出卡牌 {cardData.cardName}（无有效目标）");
+                    }
+                    CancelCurrentAction();
+                    return;
+                }
+
+                // 高亮有效目标
+                HighlightSpellTargets(validTargets);
+
+                // 保存状态用于目标选择完成后
+                _pendingCardHandIndex = capturedHandIndex;
+                _pendingCardTileIndex = placementTileIndex;
+                _pendingUseEnhance = capturedUseEnhance;
+                _currentState = BattleUIState.SelectingTarget;
+
+                Debug.Log($"BattleUIController: 等待选择目标 - {cardData.cardName}");
+                return;
+            }
+
             bool success;
 
             if (cardData.cardType == CardType.Spell)
@@ -914,41 +1075,96 @@ namespace ShadowCardSmash.UI.Battle
             CancelCurrentAction();
         }
 
-        private void ExecuteCardWithTarget(TileSlotController targetTile)
+        /// <summary>
+        /// 检查卡牌是否需要选择地格
+        /// </summary>
+        private bool RequiresTileSelection(CardData cardData)
         {
-            if (_selectedHandIndex < 0) return;
+            if (cardData.effects == null) return false;
 
-            // 获取卡牌信息
-            var myState = gameController.GetLocalPlayerState();
-            if (myState == null || _selectedHandIndex >= myState.hand.Count) return;
-
-            var card = myState.hand[_selectedHandIndex];
-            var cardData = _cardDatabase?.GetCardById(card.cardId);
-
-            int targetInstanceId = -1;
-            bool targetIsPlayer = false;
-            int targetPlayerId = -1;
-
-            if (!targetTile.IsEmpty)
+            foreach (var effect in cardData.effects)
             {
-                var occupant = targetTile.GetOccupant();
-                if (occupant?.RuntimeCard != null)
+                if (effect.effectType == EffectType.ApplyTileEffect &&
+                    effect.targetType == TargetType.EnemyTiles)
                 {
-                    targetInstanceId = occupant.RuntimeCard.instanceId;
+                    return true;
                 }
             }
+            return false;
+        }
 
-            // 判断是否可以使用强化
-            bool useEnhance = cardData != null && cardData.HasEnhance() && myState.mana >= cardData.enhanceCost;
+        /// <summary>
+        /// 获取需要选择的地格数量
+        /// </summary>
+        private int GetRequiredTileCount(CardData cardData)
+        {
+            if (cardData.effects == null) return 0;
 
-            bool success = gameController.TryPlayCard(_selectedHandIndex, 0, targetInstanceId, targetIsPlayer, targetPlayerId, useEnhance);
-
-            if (success)
+            foreach (var effect in cardData.effects)
             {
-                Debug.Log($"BattleUIController: 打出卡牌，目标: {targetInstanceId} (强化: {useEnhance})");
+                if (effect.effectType == EffectType.ApplyTileEffect &&
+                    effect.parameters != null && effect.parameters.Count >= 3)
+                {
+                    if (int.TryParse(effect.parameters[2], out int count))
+                    {
+                        return count;
+                    }
+                }
             }
+            return 1;
+        }
 
-            CancelCurrentAction();
+        /// <summary>
+        /// 检查卡牌是否需要选择手牌丢弃（DiscardToGain 效果）
+        /// </summary>
+        private bool RequiresHandCardDiscard(CardData cardData)
+        {
+            if (cardData.effects == null) return false;
+
+            foreach (var effect in cardData.effects)
+            {
+                if (effect.effectType == EffectType.DiscardToGain &&
+                    effect.trigger == EffectTrigger.OnPlay)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 获取手牌选择的过滤器（用于 DiscardToGain 效果的 filter:minion 等参数）
+        /// </summary>
+        private Func<RuntimeCard, bool> GetHandCardFilter(CardData cardData)
+        {
+            if (cardData.effects == null) return null;
+
+            foreach (var effect in cardData.effects)
+            {
+                if (effect.effectType == EffectType.DiscardToGain &&
+                    effect.trigger == EffectTrigger.OnPlay &&
+                    effect.parameters != null)
+                {
+                    foreach (var param in effect.parameters)
+                    {
+                        if (param.StartsWith("filter:"))
+                        {
+                            string filterType = param.Substring(7); // 去掉 "filter:" 前缀
+                            if (filterType == "minion")
+                            {
+                                // 只显示随从牌
+                                return (RuntimeCard handCard) =>
+                                {
+                                    var data = _cardDatabase?.GetCardById(handCard.cardId);
+                                    return data != null && data.cardType == CardType.Minion;
+                                };
+                            }
+                            // 可以在这里添加更多过滤类型
+                        }
+                    }
+                }
+            }
+            return null;
         }
 
         #endregion
@@ -1053,6 +1269,54 @@ namespace ShadowCardSmash.UI.Battle
             {
                 Debug.LogWarning($"BattleUIController: 进化失败 - 单位 {instanceId}");
             }
+
+            CancelCurrentAction();
+        }
+
+        private void ExecuteCardWithTarget(TileSlotController targetTile)
+        {
+            if (_pendingCardHandIndex < 0)
+            {
+                Debug.LogWarning("BattleUIController: 没有待执行的卡牌");
+                CancelCurrentAction();
+                return;
+            }
+
+            int targetInstanceId = -1;
+            bool targetIsPlayer = false;
+            int targetPlayerId = -1;
+
+            if (!targetTile.IsEmpty)
+            {
+                var occupant = targetTile.GetOccupant();
+                if (occupant?.RuntimeCard != null)
+                {
+                    targetInstanceId = occupant.RuntimeCard.instanceId;
+                }
+            }
+
+            bool success = gameController.TryPlayCard(
+                _pendingCardHandIndex,
+                _pendingCardTileIndex,
+                targetInstanceId,
+                targetIsPlayer,
+                targetPlayerId,
+                _pendingUseEnhance
+            );
+
+            if (success)
+            {
+                Debug.Log($"BattleUIController: 打出卡牌并选择目标 {targetInstanceId}");
+            }
+            else
+            {
+                Debug.LogWarning("BattleUIController: 打出卡牌失败");
+            }
+
+            // 清除待执行状态
+            _pendingCardHandIndex = -1;
+            _pendingCardTileIndex = -1;
+            _pendingUseEnhance = false;
 
             CancelCurrentAction();
         }
@@ -1416,6 +1680,198 @@ namespace ShadowCardSmash.UI.Battle
 
         #endregion
 
+        #region Hand Card Selection
+
+        /// <summary>
+        /// 显示手牌选择UI
+        /// </summary>
+        /// <param name="title">标题</param>
+        /// <param name="instruction">说明</param>
+        /// <param name="filter">过滤函数</param>
+        /// <param name="excludeInstanceId">排除的卡牌ID（排除自己）</param>
+        /// <param name="onSelected">选择回调</param>
+        /// <param name="onCancelled">取消回调</param>
+        public void ShowHandCardSelection(string title, string instruction,
+            Func<RuntimeCard, bool> filter = null, int excludeInstanceId = -1,
+            System.Action<int> onSelected = null, System.Action onCancelled = null)
+        {
+            if (handCardSelectionUI == null)
+            {
+                Debug.LogError("BattleUIController: handCardSelectionUI 未设置!");
+                onCancelled?.Invoke();
+                return;
+            }
+
+            var myState = gameController?.GetLocalPlayerState();
+            if (myState == null || myState.hand.Count == 0)
+            {
+                Debug.LogWarning("BattleUIController: 没有手牌可选择");
+                onCancelled?.Invoke();
+                return;
+            }
+
+            _handCardSelectionCallback = onSelected;
+            _handCardSelectionCancelCallback = onCancelled;
+
+            handCardSelectionUI.Show(myState.hand, title, instruction, filter, excludeInstanceId);
+            Debug.Log($"BattleUIController: 显示手牌选择UI - {title}");
+        }
+
+        /// <summary>
+        /// 隐藏手牌选择UI
+        /// </summary>
+        public void HideHandCardSelection()
+        {
+            if (handCardSelectionUI != null)
+            {
+                handCardSelectionUI.Hide();
+            }
+            _handCardSelectionCallback = null;
+            _handCardSelectionCancelCallback = null;
+        }
+
+        /// <summary>
+        /// 检查手牌选择UI是否可见
+        /// </summary>
+        public bool IsHandCardSelectionVisible()
+        {
+            return handCardSelectionUI != null && handCardSelectionUI.IsVisible();
+        }
+
+        private void OnHandCardSelected(int handIndex)
+        {
+            Debug.Log($"BattleUIController: 手牌选择完成 - 索引{handIndex}");
+            var callback = _handCardSelectionCallback;
+            _handCardSelectionCallback = null;
+            _handCardSelectionCancelCallback = null;
+            callback?.Invoke(handIndex);
+        }
+
+        private void OnHandCardSelectionCancelled()
+        {
+            Debug.Log("BattleUIController: 手牌选择取消");
+            var callback = _handCardSelectionCancelCallback;
+            _handCardSelectionCallback = null;
+            _handCardSelectionCancelCallback = null;
+            callback?.Invoke();
+        }
+
+        #endregion
+
+        #region Multiple Tile Selection
+
+        /// <summary>
+        /// 开始多选地格模式（用于倾盆大雨等）
+        /// </summary>
+        /// <param name="count">需要选择的地格数量</param>
+        /// <param name="selectEnemy">是否选择敌方地格</param>
+        /// <param name="onComplete">完成回调，参数为选中的地格索引列表</param>
+        public void StartMultipleTileSelection(int count, bool selectEnemy, System.Action<List<int>> onComplete)
+        {
+            _selectedTileIndices.Clear();
+            _requiredTileCount = count;
+            _selectingEnemyTiles = selectEnemy;
+            _tileSelectionCallback = onComplete;
+
+            // 高亮可选的地格
+            HighlightSelectableTiles(selectEnemy);
+
+            SetState(BattleUIState.SelectingMultipleTiles);
+            Debug.Log($"BattleUIController: 开始多选地格模式，需要选择{count}个{(selectEnemy ? "敌方" : "我方")}地格");
+        }
+
+        /// <summary>
+        /// 取消多选地格模式
+        /// </summary>
+        public void CancelMultipleTileSelection()
+        {
+            _selectedTileIndices.Clear();
+            _requiredTileCount = 0;
+            _tileSelectionCallback = null;
+
+            ClearAllHighlights();
+            SetState(BattleUIState.Idle);
+            Debug.Log("BattleUIController: 取消多选地格模式");
+        }
+
+        /// <summary>
+        /// 处理多选地格时的点击
+        /// </summary>
+        private void HandleMultipleTileSelection(TileSlotController tile)
+        {
+            // 检查是否是有效的地格（敌方/我方）
+            if (_selectingEnemyTiles != tile.isOpponentTile)
+            {
+                Debug.Log($"BattleUIController: 无效地格（需要{(_selectingEnemyTiles ? "敌方" : "我方")}地格）");
+                return;
+            }
+
+            int tileIndex = tile.tileIndex;
+
+            // 检查是否已经选中
+            if (_selectedTileIndices.Contains(tileIndex))
+            {
+                // 取消选中
+                _selectedTileIndices.Remove(tileIndex);
+                tile.SetValidPlacementTarget(true); // 恢复高亮但未选中状态
+                Debug.Log($"BattleUIController: 取消选中地格{tileIndex}，当前选中{_selectedTileIndices.Count}/{_requiredTileCount}");
+            }
+            else
+            {
+                // 选中
+                if (_selectedTileIndices.Count < _requiredTileCount)
+                {
+                    _selectedTileIndices.Add(tileIndex);
+                    tile.SetValidAttackTarget(true); // 用攻击目标高亮表示已选中
+                    Debug.Log($"BattleUIController: 选中地格{tileIndex}，当前选中{_selectedTileIndices.Count}/{_requiredTileCount}");
+
+                    // 检查是否已选够
+                    if (_selectedTileIndices.Count >= _requiredTileCount)
+                    {
+                        CompleteMultipleTileSelection();
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// 完成多选地格
+        /// </summary>
+        private void CompleteMultipleTileSelection()
+        {
+            var callback = _tileSelectionCallback;
+            var selectedTiles = new List<int>(_selectedTileIndices);
+
+            _selectedTileIndices.Clear();
+            _requiredTileCount = 0;
+            _tileSelectionCallback = null;
+
+            ClearAllHighlights();
+            SetState(BattleUIState.Idle);
+
+            Debug.Log($"BattleUIController: 完成多选地格，选中了{selectedTiles.Count}个地格");
+            callback?.Invoke(selectedTiles);
+        }
+
+        /// <summary>
+        /// 高亮可选择的地格
+        /// </summary>
+        private void HighlightSelectableTiles(bool selectEnemy)
+        {
+            var tiles = selectEnemy ? opponentTiles : myTiles;
+            if (tiles == null) return;
+
+            foreach (var tile in tiles)
+            {
+                if (tile != null)
+                {
+                    tile.SetValidPlacementTarget(true);
+                }
+            }
+        }
+
+        #endregion
+
         #region Utility
 
         private void ShowMessage(string message)
@@ -1449,6 +1905,7 @@ namespace ShadowCardSmash.UI.Battle
         SelectingAttacker,      // 选择攻击者
         SelectingAttackTarget,  // 选择攻击目标
         SelectingEvolutionTarget, // 选择进化目标
+        SelectingMultipleTiles, // 选择多个地格（倾盆大雨等）
         WaitingForOpponent,     // 等待对手
         Animating               // 播放动画中
     }

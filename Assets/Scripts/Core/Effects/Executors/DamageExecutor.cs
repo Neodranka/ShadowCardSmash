@@ -13,6 +13,25 @@ namespace ShadowCardSmash.Core.Effects.Executors
             int damage = context.Value;
             int sourceInstanceId = context.Source?.instanceId ?? -1;
 
+            // 检查是否使用目标属性作为伤害值
+            if (context.Parameters != null && context.Parameters.Count > 0)
+            {
+                foreach (var param in context.Parameters)
+                {
+                    if (param.StartsWith("value_from:"))
+                    {
+                        string valueSource = param.Substring("value_from:".Length);
+                        if (valueSource == "target_attack" && context.Targets.Count > 0)
+                        {
+                            // 使用目标的攻击力作为伤害值
+                            var target = context.Targets[0];
+                            damage = target.currentAttack;
+                            UnityEngine.Debug.Log($"DamageExecutor: 使用目标攻击力作为伤害值: {damage}");
+                        }
+                    }
+                }
+            }
+
             // 如果是全体目标（所有随从+双方玩家）
             if (context.TargetAll)
             {

@@ -128,6 +128,34 @@ namespace ShadowCardSmash.Core.Data
         /// </summary>
         public static RuntimeCard FromCardData(CardData cardData, int instanceId, int ownerId)
         {
+            // 从关键词列表中提取初始关键词
+            bool hasWard = false;
+            bool hasRush = false;
+            bool hasStorm = false;
+            bool hasDrain = false;
+
+            if (cardData.keywords != null)
+            {
+                foreach (var keyword in cardData.keywords)
+                {
+                    switch (keyword)
+                    {
+                        case Keyword.Ward:
+                            hasWard = true;
+                            break;
+                        case Keyword.Rush:
+                            hasRush = true;
+                            break;
+                        case Keyword.Storm:
+                            hasStorm = true;
+                            break;
+                        case Keyword.Drain:
+                            hasDrain = true;
+                            break;
+                    }
+                }
+            }
+
             var runtimeCard = new RuntimeCard
             {
                 instanceId = instanceId,
@@ -137,31 +165,19 @@ namespace ShadowCardSmash.Core.Data
                 currentHealth = cardData.health,
                 maxHealth = cardData.health,
                 isEvolved = false,
-                canAttack = false, // 默认召唤失调
+                canAttack = hasStorm, // 疾驰可以立即攻击
                 attackedThisTurn = false,
                 summonedThisTurn = true, // 入场当回合
                 isSilenced = false,
                 isEnhanced = false,
                 currentCountdown = cardData.countdown,
-                hasWard = false,
-                hasRush = false,
-                hasStorm = false,
-                hasBarrier = false,
-                hasDrain = false,
+                hasWard = hasWard,
+                hasRush = hasRush,
+                hasStorm = hasStorm,
+                hasBarrier = cardData.hasBarrier,
+                hasDrain = hasDrain,
                 buffs = new List<BuffData>()
             };
-
-            // 从效果中提取初始关键词
-            if (cardData.effects != null)
-            {
-                foreach (var effect in cardData.effects)
-                {
-                    if (effect.effectType == EffectType.GainKeyword && effect.trigger == EffectTrigger.OnPlay)
-                    {
-                        // 注：实际关键词应该在效果系统中处理
-                    }
-                }
-            }
 
             return runtimeCard;
         }

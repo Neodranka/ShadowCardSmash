@@ -80,7 +80,8 @@ namespace ShadowCardSmash.Core.Data
         OnEnemyDestroy,     // 敌方单位被破坏时
         OnOwnerTurnEnd,     // 自己回合结束时（吸血鬼用）
         OnMinionDestroyed,  // 任意随从被破坏时
-        OnOwnerDamaged      // 自己玩家受伤时
+        OnOwnerDamaged,     // 自己玩家受伤时
+        OnDraw              // 抽牌时触发
     }
 
     /// <summary>
@@ -118,7 +119,9 @@ namespace ShadowCardSmash.Core.Data
         KurentiSpecial, // 克伦缇特殊效果
         DestroyAllOther,// 破坏所有其他随从
         SelfEvolve,     // 自我进化
-        AddCardToHand   // 添加卡牌到手牌
+        AddCardToHand,  // 添加卡牌到手牌
+        ApplyTileEffect,// 给地格施加效果
+        ShuffleAndDraw  // 洗入牌库并抽牌
     }
 
     /// <summary>
@@ -140,7 +143,18 @@ namespace ShadowCardSmash.Core.Data
         AllyPlayer,         // 友方玩家
         AdjacentTiles,      // 相邻格子
         All,                // 所有随从+双方玩家
-        SingleMinion        // 单个随从（双方都可选）
+        SingleMinion,       // 单个随从（双方都可选）
+        EnemyTiles,         // 敌方地格（用于倾盆大雨）
+        HandCard            // 手牌（用于军需官）
+    }
+
+    /// <summary>
+    /// 地格效果类型
+    /// </summary>
+    public enum TileEffectType
+    {
+        None,           // 无效果
+        DownpourRain    // 倾盆大雨：回合结束时随机-1/-0或-0/-1
     }
 
     /// <summary>

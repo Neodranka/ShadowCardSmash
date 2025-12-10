@@ -127,10 +127,12 @@ namespace ShadowCardSmash.UI.Battle
                     UpdateStatText(attackText, _runtimeCard.currentAttack, _cardData.attack);
                     UpdateStatText(healthText, _runtimeCard.currentHealth, _cardData.health);
 
-                    // 更新状态指示器
-                    SetIndicatorActive(evolvedIndicator, _runtimeCard.isEvolved);
-                    SetIndicatorActive(summoningSicknessIndicator, !_runtimeCard.canAttack && !_runtimeCard.isEvolved);
-                    SetIndicatorActive(canAttackGlow, _runtimeCard.canAttack);
+                    // 更新状态指示器（只有在战场上才显示，手牌中不显示）
+                    // 手牌中的卡牌 _handIndex >= 0，战场上的卡牌 _handIndex 保持默认值 -1
+                    bool isInHand = _handIndex >= 0;
+                    SetIndicatorActive(evolvedIndicator, !isInHand && _runtimeCard.isEvolved);
+                    SetIndicatorActive(summoningSicknessIndicator, !isInHand && !_runtimeCard.canAttack && !_runtimeCard.isEvolved);
+                    SetIndicatorActive(canAttackGlow, !isInHand && _runtimeCard.canAttack);
                 }
                 else
                 {

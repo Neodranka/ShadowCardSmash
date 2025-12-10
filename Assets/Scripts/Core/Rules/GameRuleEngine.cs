@@ -310,7 +310,9 @@ namespace ShadowCardSmash.Core.Rules
             var runtimeCard = RuntimeCard.FromCardData(cardData, cardInHand.instanceId, action.playerId);
 
             // 设置召唤失调
-            runtimeCard.canAttack = runtimeCard.hasStorm;
+            // 疾驰(Storm)和突进(Rush)都可以在入场回合攻击
+            // 突进只能攻击随从，疾驰可以攻击玩家（在CombatResolver中检查）
+            runtimeCard.canAttack = runtimeCard.hasStorm || runtimeCard.hasRush;
 
             // 检查卡牌是否有初始关键词
             foreach (var effect in cardData.effects)
@@ -333,9 +335,20 @@ namespace ShadowCardSmash.Core.Rules
             ));
 
             // 触发开幕效果
-            var targets = action.targetInstanceId >= 0
-                ? new List<RuntimeCard> { _currentState.FindCardByInstanceId(action.targetInstanceId) }
-                : null;
+            List<RuntimeCard> targets = null;
+            if (action.targetInstanceId >= 0)
+            {
+                var targetCard = _currentState.FindCardByInstanceId(action.targetInstanceId);
+                if (targetCard != null)
+                {
+                    targets = new List<RuntimeCard> { targetCard };
+                }
+            }
+            else if (action.handCardTargetIndex >= 0 && action.handCardTargetIndex < player.hand.Count)
+            {
+                // 选择的手牌作为目标（用于军需官等）
+                targets = new List<RuntimeCard> { player.hand[action.handCardTargetIndex] };
+            }
 
             foreach (var effect in cardData.effects)
             {
@@ -408,7 +421,8 @@ namespace ShadowCardSmash.Core.Rules
                     }
 
                     var effectEvents = _effectSystem.ProcessEffectWithPlayerTarget(
-                        _currentState, null, action.playerId, effect, effectTargets, targetIsPlayer, targetPlayerId);
+                        _currentState, null, action.playerId, effect, effectTargets, targetIsPlayer, targetPlayerId,
+                        action.selectedTileIndices);
                     events.AddRange(effectEvents);
                 }
             }
@@ -427,7 +441,8 @@ namespace ShadowCardSmash.Core.Rules
                     }
 
                     var effectEvents = _effectSystem.ProcessEffectWithPlayerTarget(
-                        _currentState, null, action.playerId, effect, effectTargets, targetIsPlayer, targetPlayerId);
+                        _currentState, null, action.playerId, effect, effectTargets, targetIsPlayer, targetPlayerId,
+                        action.selectedTileIndices);
                     events.AddRange(effectEvents);
                 }
             }
@@ -666,10 +681,66 @@ namespace ShadowCardSmash.Core.Rules
                     if (player.GetEmptyTileCount() == 0) continue;
                 }
 
+                // 检查需要选择手牌的卡牌是否有有效目标
+                if (!CheckHandCardTargetAvailable(player, card, cardData, i))
+                {
+                    continue;
+                }
+
                 result.Add(i);
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// 检查需要选择手牌的卡牌是否有有效目标
+        /// </summary>
+        private bool CheckHandCardTargetAvailable(PlayerState player, RuntimeCard card, CardData cardData, int handIndex)
+        {
+            // 检查是否需要选择手牌
+            if (cardData.validTargets == TargetType.HandCard)
+            {
+                // 需要至少有一张其他手牌可以选择
+                return player.hand.Count > 1;
+            }
+
+            // 检查效果是否需要弃牌（如饥饿的捕食者）
+            if (cardData.effects != null)
+            {
+                foreach (var effect in cardData.effects)
+                {
+                    if (effect.effectType == EffectType.DiscardToGain)
+                    {
+                        // 检查参数中的过滤条件
+                        bool requireMinion = effect.parameters != null && effect.parameters.Contains("filter:minion");
+
+                        if (requireMinion)
+                        {
+                            // 需要手牌中有其他随从牌
+                            for (int j = 0; j < player.hand.Count; j++)
+                            {
+                                if (j == handIndex) continue; // 排除自己
+
+                                var otherCard = player.hand[j];
+                                var otherCardData = _cardDatabase?.GetCardById(otherCard.cardId);
+                                if (otherCardData != null && otherCardData.cardType == CardType.Minion)
+                                {
+                                    return true;
+                                }
+                            }
+                            return false; // 没有可弃的随从牌
+                        }
+                        else
+                        {
+                            // 只需要有其他手牌即可
+                            return player.hand.Count > 1;
+                        }
+                    }
+                }
+            }
+
+            return true;
         }
 
         /// <summary>

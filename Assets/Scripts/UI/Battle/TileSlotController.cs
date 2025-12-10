@@ -2,6 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using TMPro;
 using ShadowCardSmash.Core.Data;
 
 namespace ShadowCardSmash.UI.Battle
@@ -15,6 +16,8 @@ namespace ShadowCardSmash.UI.Battle
         public Image tileBackground;
         public Transform occupantHolder;
         public GameObject tileEffectIndicator;
+        public Image tileEffectIcon;
+        public TextMeshProUGUI tileEffectDurationText;
         public GameObject validTargetHighlight;
         public GameObject validPlacementHighlight;
         public GameObject invalidTargetIndicator;
@@ -159,17 +162,73 @@ namespace ShadowCardSmash.UI.Battle
         }
 
         /// <summary>
-        /// 显示格子效果
+        /// 显示格子效果（TileEffect类型）
         /// </summary>
         public void ShowTileEffect(TileEffect effect)
         {
-            SetIndicatorActive(tileEffectIndicator, effect != null);
+            bool hasEffect = effect != null && effect.tileEffectType != TileEffectType.None && effect.remainingTurns != 0;
+            SetIndicatorActive(tileEffectIndicator, hasEffect);
 
-            // TODO: 根据效果类型显示不同图标
-            if (effect != null)
+            if (hasEffect)
             {
-                Debug.Log($"TileSlotController: 格子{tileIndex}显示效果 - {effect.effectType}");
+                // 设置效果图标颜色（根据效果类型）
+                if (tileEffectIcon != null)
+                {
+                    switch (effect.tileEffectType)
+                    {
+                        case TileEffectType.DownpourRain:
+                            tileEffectIcon.color = new Color(0.3f, 0.5f, 0.9f, 0.8f); // 蓝色表示雨
+                            break;
+                        default:
+                            tileEffectIcon.color = new Color(0.8f, 0.8f, 0.2f, 0.8f); // 默认黄色
+                            break;
+                    }
+                }
+
+                // 显示剩余回合数
+                if (tileEffectDurationText != null)
+                {
+                    tileEffectDurationText.text = effect.remainingTurns > 0 ? effect.remainingTurns.ToString() : "";
+                }
+
+                Debug.Log($"TileSlotController: 格子{tileIndex}显示地格效果 - {effect.tileEffectType}, 剩余{effect.remainingTurns}回合");
             }
+        }
+
+        /// <summary>
+        /// 根据TileState显示地格效果
+        /// </summary>
+        public void UpdateTileEffectDisplay(TileState tileState)
+        {
+            if (tileState == null)
+            {
+                SetIndicatorActive(tileEffectIndicator, false);
+                return;
+            }
+
+            // 查找活跃的地格效果
+            TileEffect activeEffect = null;
+            if (tileState.effects != null)
+            {
+                foreach (var effect in tileState.effects)
+                {
+                    if (effect.tileEffectType != TileEffectType.None && effect.remainingTurns != 0)
+                    {
+                        activeEffect = effect;
+                        break;
+                    }
+                }
+            }
+
+            ShowTileEffect(activeEffect);
+        }
+
+        /// <summary>
+        /// 清除地格效果显示
+        /// </summary>
+        public void ClearTileEffectDisplay()
+        {
+            SetIndicatorActive(tileEffectIndicator, false);
         }
 
         /// <summary>

@@ -151,6 +151,11 @@ namespace ShadowCardSmash.Core.Data
         /// </summary>
         public bool isToken;
 
+        /// <summary>
+        /// 是否拥有屏障（入场时自带屏障）
+        /// </summary>
+        public bool hasBarrier;
+
         // ========== 资源引用 ==========
 
         /// <summary>

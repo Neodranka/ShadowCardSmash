@@ -147,6 +147,10 @@ namespace ShadowCardSmash.Core.Rules
 
                     player.hand.Add(runtimeCard);
                     events.Add(new CardDrawnEvent(playerId, cardId, instanceId, false, false));
+
+                    // 触发抽牌效果（公会总管等）
+                    var drawTriggerEvents = _effectSystem.TriggerEffects(state, EffectTrigger.OnDraw, null, playerId);
+                    events.AddRange(drawTriggerEvents);
                 }
             }
 
@@ -173,8 +177,99 @@ namespace ShadowCardSmash.Core.Rules
             var triggerEvents = _effectSystem.TriggerEffects(state, EffectTrigger.OnTurnEnd, null, playerId);
             events.AddRange(triggerEvents);
 
+            // 处理倾盆大雨等地格效果（回合结束时触发）
+            var tileEndTurnEvents = ProcessTileEffectsOnTurnEnd(state, playerId);
+            events.AddRange(tileEndTurnEvents);
+
             // 生成回合结束事件
             events.Add(new TurnEndEvent(playerId));
+
+            return events;
+        }
+
+        /// <summary>
+        /// 处理回合结束时的地格效果（如倾盆大雨）
+        /// </summary>
+        private List<GameEvent> ProcessTileEffectsOnTurnEnd(GameState state, int playerId)
+        {
+            var events = new List<GameEvent>();
+            var player = state.GetPlayer(playerId);
+            var random = new System.Random();
+
+            for (int i = 0; i < player.field.Length; i++)
+            {
+                var tile = player.field[i];
+
+                // 处理倾盆大雨效果
+                var downpourEffect = tile.GetTileEffect(TileEffectType.DownpourRain);
+                if (downpourEffect != null && downpourEffect.ownerId == playerId && tile.occupant != null)
+                {
+                    var unit = tile.occupant;
+                    int attackChange = 0;
+                    int healthChange = 0;
+
+                    // 随机-1/-0或-0/-1
+                    if (random.Next(2) == 0)
+                    {
+                        // -1/-0
+                        attackChange = -1;
+                        unit.currentAttack = System.Math.Max(0, unit.currentAttack - 1);
+                    }
+                    else
+                    {
+                        // -0/-1
+                        healthChange = -1;
+                        unit.currentHealth -= 1;
+                    }
+
+                    events.Add(new TileEffectTriggeredEvent(
+                        playerId,
+                        playerId,
+                        i,
+                        TileEffectType.DownpourRain,
+                        unit.instanceId,
+                        attackChange,
+                        healthChange
+                    ));
+
+                    UnityEngine.Debug.Log($"TurnManager: 倾盆大雨效果 - 格子{i}的随从{unit.instanceId}获得{attackChange}/{healthChange}");
+
+                    // 检查死亡
+                    if (unit.IsDead())
+                    {
+                        tile.RemoveUnit();
+                        player.graveyard.Add(unit.cardId);
+
+                        // 记录随从被破坏
+                        state.GetPlayer(0).RecordMinionDestroyed();
+                        state.GetPlayer(1).RecordMinionDestroyed();
+
+                        events.Add(new UnitDestroyedEvent(
+                            playerId,
+                            unit.instanceId,
+                            unit.cardId,
+                            i,
+                            playerId,
+                            false
+                        ));
+                    }
+                }
+
+                // 减少地格效果持续回合
+                foreach (var effect in tile.effects)
+                {
+                    if (effect.tileEffectType != TileEffectType.None && effect.ownerId == playerId)
+                    {
+                        if (effect.remainingTurns > 0)
+                        {
+                            effect.remainingTurns--;
+                        }
+                    }
+                }
+
+                // 移除过期效果
+                tile.RemoveExpiredEffects();
+            }
 
             return events;
         }
@@ -243,9 +338,8 @@ namespace ShadowCardSmash.Core.Rules
 
             foreach (var tile in player.field)
             {
-                // 减少格子效果持续时间
-                tile.TickEffects();
-                tile.RemoveExpiredEffects();
+                // 注意：地格效果的持续时间在回合结束时递减（ProcessTileEffectsOnTurnEnd）
+                // 这里只处理回合开始时触发的效果
 
                 // 处理回合开始触发的格子效果
                 if (tile.occupant != null)

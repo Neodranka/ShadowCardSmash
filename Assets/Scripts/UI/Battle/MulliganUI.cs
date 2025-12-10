@@ -120,6 +120,20 @@ namespace ShadowCardSmash.UI.Battle
                     cardObj = CreateSimpleCardView(actualContainer);
                 }
 
+                int index = i; // 闭包捕获
+
+                // 检查是否有 CardViewController（使用 CardView prefab 的情况）
+                var cardViewController = cardObj.GetComponent<CardViewController>();
+                if (cardViewController != null)
+                {
+                    // 使用 CardViewController，需要适配
+                    var mulliganView = SetupMulliganViewFromCardViewController(cardObj, cardViewController, cardData, index);
+                    _cardViews.Add(mulliganView);
+                    Debug.Log($"MulliganUI: 从CardViewController创建卡牌视图 {i}, cardData={cardData?.cardName ?? "null"}");
+                    continue;
+                }
+
+                // 使用 MulliganCardView
                 var cardView = cardObj.GetComponent<MulliganCardView>();
                 if (cardView == null)
                 {
@@ -131,8 +145,6 @@ namespace ShadowCardSmash.UI.Battle
                     cardView.nameText = cardObj.transform.Find("NameText")?.GetComponent<TextMeshProUGUI>();
                     cardView.costText = cardObj.transform.Find("CostText")?.GetComponent<TextMeshProUGUI>();
                 }
-
-                int index = i; // 闭包捕获
 
                 // 先清除旧的事件订阅，再设置
                 cardView.OnClicked = null;
@@ -242,6 +254,101 @@ namespace ShadowCardSmash.UI.Battle
         public int GetCurrentPlayerId()
         {
             return _currentPlayerId;
+        }
+
+        /// <summary>
+        /// 从 CardViewController 设置 MulliganCardView（兼容使用 CardView prefab）
+        /// </summary>
+        private MulliganCardView SetupMulliganViewFromCardViewController(GameObject cardObj, CardViewController cardViewController, CardData cardData, int index)
+        {
+            // 添加或获取 MulliganCardView 组件
+            var mulliganView = cardObj.GetComponent<MulliganCardView>();
+            if (mulliganView == null)
+            {
+                mulliganView = cardObj.AddComponent<MulliganCardView>();
+            }
+
+            // 从 CardViewController 复制引用到 MulliganCardView
+            mulliganView.cardFrame = cardViewController.cardFrame;
+            mulliganView.cardArt = cardViewController.cardArt;
+            mulliganView.nameText = cardViewController.cardNameText;
+            mulliganView.costText = cardViewController.costText;
+            mulliganView.attackText = cardViewController.attackText;
+            mulliganView.healthText = cardViewController.healthText;
+            mulliganView.attackHealthGroup = cardViewController.attackHealthGroup;
+
+            // 使用 CardViewController 的 selectionHighlight 作为 selectedOverlay
+            mulliganView.selectedOverlay = cardViewController.selectionHighlight;
+
+            // 如果没有 selectionHighlight，创建一个选择遮罩
+            if (mulliganView.selectedOverlay == null)
+            {
+                var overlayObj = new GameObject("SelectedOverlay");
+                overlayObj.transform.SetParent(cardObj.transform, false);
+                var overlayRect = overlayObj.AddComponent<RectTransform>();
+                overlayRect.anchorMin = Vector2.zero;
+                overlayRect.anchorMax = Vector2.one;
+                overlayRect.sizeDelta = Vector2.zero;
+                overlayRect.offsetMin = Vector2.zero;
+                overlayRect.offsetMax = Vector2.zero;
+                var overlayImage = overlayObj.AddComponent<Image>();
+                overlayImage.color = new Color(1f, 0.5f, 0f, 0.5f);
+                overlayImage.raycastTarget = false;
+                overlayObj.SetActive(false);
+                mulliganView.selectedOverlay = overlayObj;
+            }
+
+            // 确保有 Button 组件用于点击
+            var button = cardObj.GetComponent<Button>();
+            if (button == null)
+            {
+                button = cardObj.AddComponent<Button>();
+                // 设置 Button 的 targetGraphic
+                var image = cardObj.GetComponent<Image>();
+                if (image != null)
+                {
+                    button.targetGraphic = image;
+                }
+            }
+            mulliganView.cardButton = button;
+
+            // 使用 CardViewController 显示卡牌数据
+            cardViewController.SetCardData(cardData);
+
+            // 设置 MulliganCardView（不会重复设置已由 CardViewController 设置的文本）
+            mulliganView.OnClicked = null;
+
+            // 手动设置索引和选择状态（不调用 Setup 避免覆盖 CardViewController 的显示）
+            // 使用反射或直接访问字段
+            SetMulliganViewIndex(mulliganView, index);
+            mulliganView.SetSelected(false);
+
+            // 设置按钮点击事件
+            button.onClick.RemoveAllListeners();
+            button.onClick.AddListener(() => {
+                Debug.Log($"MulliganUI: CardViewController卡牌 {index} 被点击");
+                mulliganView.OnClicked?.Invoke();
+            });
+
+            // 订阅点击事件
+            mulliganView.OnClicked += () => {
+                Debug.Log($"MulliganUI: 卡牌 {index} 被点击 (来自CardViewController)");
+                ToggleCard(index);
+            };
+
+            return mulliganView;
+        }
+
+        /// <summary>
+        /// 设置 MulliganCardView 的索引（通过反射访问私有字段）
+        /// </summary>
+        private void SetMulliganViewIndex(MulliganCardView view, int index)
+        {
+            var field = typeof(MulliganCardView).GetField("_handIndex", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (field != null)
+            {
+                field.SetValue(view, index);
+            }
         }
 
         /// <summary>

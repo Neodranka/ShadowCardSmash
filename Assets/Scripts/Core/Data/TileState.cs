@@ -99,5 +99,59 @@ namespace ShadowCardSmash.Core.Data
                 }
             }
         }
+
+        /// <summary>
+        /// 检查是否有特定类型的地格效果
+        /// </summary>
+        public bool HasTileEffect(TileEffectType effectType)
+        {
+            foreach (var effect in effects)
+            {
+                if (effect.tileEffectType == effectType && effect.remainingTurns != 0)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 获取特定类型的地格效果
+        /// </summary>
+        public TileEffect GetTileEffect(TileEffectType effectType)
+        {
+            foreach (var effect in effects)
+            {
+                if (effect.tileEffectType == effectType && effect.remainingTurns != 0)
+                {
+                    return effect;
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// 添加地格效果（倾盆大雨等）
+        /// </summary>
+        public void ApplyTileEffect(TileEffectType effectType, int duration, int ownerId)
+        {
+            var effect = new TileEffect(effectType, duration, ownerId);
+            effects.Add(effect);
+        }
+
+        /// <summary>
+        /// 检查是否有任何活跃的地格效果
+        /// </summary>
+        public bool HasAnyTileEffect()
+        {
+            foreach (var effect in effects)
+            {
+                if (effect.tileEffectType != TileEffectType.None && effect.remainingTurns != 0)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 }

@@ -363,13 +363,15 @@ namespace ShadowCardSmash.UI.Battle
 
             if (cardView != null)
             {
+                // 先设置手牌索引，这样 RefreshDisplay 时才能正确判断是否在手牌中
+                cardView.HandIndex = index;
+
                 // 设置卡牌数据
                 CardData cardData = _cardDatabase?.GetCardById(card.cardId);
                 if (cardData != null)
                 {
                     cardView.SetRuntimeCard(card, cardData);
                 }
-                cardView.HandIndex = index;
 
                 // 订阅事件
                 cardView.OnCardClicked += HandleCardClicked;

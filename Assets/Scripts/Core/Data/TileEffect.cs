@@ -19,7 +19,12 @@ namespace ShadowCardSmash.Core.Data
         public int sourceCardId;
 
         /// <summary>
-        /// 效果类型
+        /// 地格效果类型（如倾盆大雨）
+        /// </summary>
+        public TileEffectType tileEffectType;
+
+        /// <summary>
+        /// 效果类型（通用效果）
         /// </summary>
         public EffectType effectType;
 
@@ -39,11 +44,18 @@ namespace ShadowCardSmash.Core.Data
         public EffectTrigger triggerTiming;
 
         /// <summary>
+        /// 效果施加者玩家ID
+        /// </summary>
+        public int ownerId;
+
+        /// <summary>
         /// 默认构造函数
         /// </summary>
         public TileEffect()
         {
             remainingTurns = -1; // 默认永久
+            tileEffectType = TileEffectType.None;
+            ownerId = -1;
         }
 
         /// <summary>
@@ -58,6 +70,20 @@ namespace ShadowCardSmash.Core.Data
             this.value = value;
             this.remainingTurns = remainingTurns;
             this.triggerTiming = triggerTiming;
+            this.tileEffectType = TileEffectType.None;
+            this.ownerId = -1;
+        }
+
+        /// <summary>
+        /// 地格效果构造函数（用于倾盆大雨等）
+        /// </summary>
+        public TileEffect(TileEffectType tileEffectType, int remainingTurns, int ownerId)
+        {
+            this.tileEffectType = tileEffectType;
+            this.remainingTurns = remainingTurns;
+            this.ownerId = ownerId;
+            this.effectType = EffectType.TileEffect;
+            this.triggerTiming = EffectTrigger.OnTurnEnd;
         }
     }
 }

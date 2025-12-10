@@ -56,8 +56,9 @@ namespace ShadowCardSmash.Core.Effects.Executors
                 int instanceId = context.GenerateInstanceId?.Invoke() ?? 0;
                 var runtimeCard = RuntimeCard.FromCardData(cardData, instanceId, context.SourcePlayerId);
 
-                // 设置召唤失调（除非有疾驰）
-                runtimeCard.canAttack = runtimeCard.hasStorm;
+                // 设置召唤失调（除非有疾驰或突进）
+                // 疾驰可以攻击任何目标，突进只能攻击随从
+                runtimeCard.canAttack = runtimeCard.hasStorm || runtimeCard.hasRush;
 
                 // 放置到格子
                 player.field[tileIndex].PlaceUnit(runtimeCard);

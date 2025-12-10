@@ -17,8 +17,15 @@ namespace ShadowCardSmash.Core.Effects.Executors
             int attackMod = 0;
             int healthMod = 0;
 
-            if (context.Parameters != null && context.Parameters.Count > 0)
+            if (context.Parameters != null && context.Parameters.Count >= 2)
             {
+                // parameters[0] = 攻击力, parameters[1] = 生命值
+                int.TryParse(context.Parameters[0].Trim().Replace("+", ""), out attackMod);
+                int.TryParse(context.Parameters[1].Trim().Replace("+", ""), out healthMod);
+            }
+            else if (context.Parameters != null && context.Parameters.Count == 1)
+            {
+                // 如果只有一个参数，检查是否是 "攻击力,生命值" 格式
                 string[] parts = context.Parameters[0].Split(',');
                 if (parts.Length >= 2)
                 {
@@ -29,7 +36,7 @@ namespace ShadowCardSmash.Core.Effects.Executors
                     int.TryParse(attackStr, out attackMod);
                     int.TryParse(healthStr, out healthMod);
                 }
-                else if (parts.Length == 1)
+                else
                 {
                     // 如果只有一个值，同时用于攻击和生命
                     string valueStr = parts[0].Trim().Replace("+", "");
@@ -44,8 +51,7 @@ namespace ShadowCardSmash.Core.Effects.Executors
             {
                 // 如果没有参数，使用Value作为攻击增益值，SecondaryValue作为生命增益
                 attackMod = context.Value;
-                // 如果SecondaryValue不为0，使用它作为生命值增益，否则与攻击相同
-                healthMod = context.SecondaryValue != 0 ? context.SecondaryValue : context.Value;
+                healthMod = context.SecondaryValue;
             }
 
             int sourceCardId = context.Source?.cardId ?? -1;

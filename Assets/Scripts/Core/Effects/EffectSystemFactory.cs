@@ -58,6 +58,10 @@ namespace ShadowCardSmash.Core.Effects
             effectSystem.RegisterExecutor(EffectType.DestroyAllOther, new DestroyAllOtherExecutor());
             effectSystem.RegisterExecutor(EffectType.KurentiSpecial, new KurentiSpecialExecutor());
 
+            // 中立卡/通用效果
+            effectSystem.RegisterExecutor(EffectType.ApplyTileEffect, new ApplyTileEffectExecutor());
+            effectSystem.RegisterExecutor(EffectType.ShuffleAndDraw, new ShuffleAndDrawExecutor());
+
             // TODO: 实现更多效果执行器
             // effectSystem.RegisterExecutor(EffectType.AddToHand, new AddToHandExecutor());
             // effectSystem.RegisterExecutor(EffectType.Transform, new TransformExecutor());

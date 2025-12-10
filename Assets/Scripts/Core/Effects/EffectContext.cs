@@ -80,6 +80,16 @@ namespace ShadowCardSmash.Core.Effects
         public System.Func<int> GenerateInstanceId { get; set; }
 
         /// <summary>
+        /// 效果系统引用（用于触发其他效果）
+        /// </summary>
+        public EffectSystem EffectSystem { get; set; }
+
+        /// <summary>
+        /// 玩家选择的地格索引列表（用于倾盆大雨等）
+        /// </summary>
+        public List<int> SelectedTileIndices { get; set; }
+
+        /// <summary>
         /// 默认构造函数
         /// </summary>
         public EffectContext()
