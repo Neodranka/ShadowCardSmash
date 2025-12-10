@@ -80,4 +80,31 @@ namespace ShadowCardSmash.Core.Data
             };
         }
     }
+
+    /// <summary>
+    /// 被添加的效果数据（如渴血符文添加的回合结束自伤效果）
+    /// </summary>
+    [Serializable]
+    public class AddedEffectData
+    {
+        /// <summary>
+        /// 触发器类型
+        /// </summary>
+        public EffectTrigger trigger;
+
+        /// <summary>
+        /// 效果类型
+        /// </summary>
+        public EffectType effectType;
+
+        /// <summary>
+        /// 效果数值
+        /// </summary>
+        public int value;
+
+        /// <summary>
+        /// 目标类型
+        /// </summary>
+        public TargetType targetType;
+    }
 }

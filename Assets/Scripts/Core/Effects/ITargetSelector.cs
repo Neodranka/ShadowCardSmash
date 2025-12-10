@@ -111,6 +111,16 @@ namespace ShadowCardSmash.Core.Effects
                     }
                     break;
 
+                case TargetType.All:
+                    // 所有随从（不包括玩家，玩家在执行器中单独处理）
+                    targets.AddRange(sourcePlayer.GetAllFieldUnits());
+                    targets.AddRange(opponentPlayer.GetAllFieldUnits());
+                    break;
+
+                case TargetType.SingleMinion:
+                    // 需要玩家选择，返回空
+                    break;
+
                 // 需要玩家选择的类型，返回空列表
                 case TargetType.SingleEnemy:
                 case TargetType.SingleAlly:
@@ -129,6 +139,7 @@ namespace ShadowCardSmash.Core.Effects
             switch (targetType)
             {
                 case TargetType.SingleEnemy:
+                case TargetType.SingleEnemyOrPlayer:
                 case TargetType.SingleAlly:
                 case TargetType.PlayerChoice:
                     return true;
@@ -146,6 +157,12 @@ namespace ShadowCardSmash.Core.Effects
             switch (targetType)
             {
                 case TargetType.SingleEnemy:
+                    // 敌方随从（不包括玩家）
+                    targets.AddRange(opponentPlayer.GetAllFieldUnits());
+                    break;
+
+                case TargetType.SingleEnemyOrPlayer:
+                    // 敌方随从（玩家在 UI 中额外处理）
                     targets.AddRange(opponentPlayer.GetAllFieldUnits());
                     break;
 
@@ -156,6 +173,12 @@ namespace ShadowCardSmash.Core.Effects
                         if (source == null || unit.instanceId != source.instanceId)
                             targets.Add(unit);
                     }
+                    break;
+
+                case TargetType.SingleMinion:
+                    // 所有场上随从都可选（双方）
+                    targets.AddRange(sourcePlayer.GetAllFieldUnits());
+                    targets.AddRange(opponentPlayer.GetAllFieldUnits());
                     break;
 
                 case TargetType.PlayerChoice:

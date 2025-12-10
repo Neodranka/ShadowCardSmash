@@ -51,6 +51,12 @@ namespace ShadowCardSmash.Core.Effects
             effectSystem.RegisterExecutor(EffectType.GainBarrier, new GainBarrierExecutor());
             effectSystem.RegisterExecutor(EffectType.SelfDamage, new SelfDamageExecutor());
             effectSystem.RegisterExecutor(EffectType.HealByDamage, new HealByDamageExecutor());
+            effectSystem.RegisterExecutor(EffectType.DiscardToGain, new DiscardToGainExecutor());
+            effectSystem.RegisterExecutor(EffectType.AddEffect, new AddEffectExecutor());
+            effectSystem.RegisterExecutor(EffectType.EqualizeHealth, new EqualizeHealthExecutor());
+            effectSystem.RegisterExecutor(EffectType.SwapHealth, new SwapHealthExecutor());
+            effectSystem.RegisterExecutor(EffectType.DestroyAllOther, new DestroyAllOtherExecutor());
+            effectSystem.RegisterExecutor(EffectType.KurentiSpecial, new KurentiSpecialExecutor());
 
             // TODO: 实现更多效果执行器
             // effectSystem.RegisterExecutor(EffectType.AddToHand, new AddToHandExecutor());

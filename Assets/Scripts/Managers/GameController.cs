@@ -261,13 +261,13 @@ namespace ShadowCardSmash.Managers
         /// 尝试使用卡牌
         /// </summary>
         public bool TryPlayCard(int handIndex, int tileIndex, int targetInstanceId = -1,
-            bool targetIsPlayer = false, int targetPlayerId = -1)
+            bool targetIsPlayer = false, int targetPlayerId = -1, bool useEnhance = false)
         {
             if (!CanPerformAction()) return false;
 
             var action = PlayerAction.CreatePlayCard(
                 _localPlayerId, handIndex, tileIndex,
-                targetInstanceId, targetIsPlayer, targetPlayerId);
+                targetInstanceId, targetIsPlayer, targetPlayerId, useEnhance);
 
             return ExecuteAction(action);
         }

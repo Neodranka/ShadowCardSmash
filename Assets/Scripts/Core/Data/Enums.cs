@@ -126,20 +126,21 @@ namespace ShadowCardSmash.Core.Data
     /// </summary>
     public enum TargetType
     {
-        Self,           // 自身
-        SingleEnemy,    // 单个敌人
-        SingleAlly,     // 单个友方
-        AllEnemies,     // 所有敌人
-        AllAllies,      // 所有友方
-        AllMinions,     // 所有随从
-        RandomEnemy,    // 随机敌人
-        RandomAlly,     // 随机友方
-        PlayerChoice,   // 玩家选择
-        EnemyPlayer,    // 敌方玩家
-        AllyPlayer,     // 友方玩家
-        AdjacentTiles,  // 相邻格子
-        All,            // 所有随从+双方玩家
-        SingleMinion    // 单个随从（双方都可选）
+        Self,               // 自身
+        SingleEnemy,        // 单个敌方随从（不含玩家）
+        SingleEnemyOrPlayer,// 单个敌方随从或敌方玩家
+        SingleAlly,         // 单个友方
+        AllEnemies,         // 所有敌人
+        AllAllies,          // 所有友方
+        AllMinions,         // 所有随从
+        RandomEnemy,        // 随机敌人
+        RandomAlly,         // 随机友方
+        PlayerChoice,       // 玩家选择
+        EnemyPlayer,        // 敌方玩家
+        AllyPlayer,         // 友方玩家
+        AdjacentTiles,      // 相邻格子
+        All,                // 所有随从+双方玩家
+        SingleMinion        // 单个随从（双方都可选）
     }
 
     /// <summary>

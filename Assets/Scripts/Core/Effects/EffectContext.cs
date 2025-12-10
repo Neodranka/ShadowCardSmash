@@ -40,6 +40,11 @@ namespace ShadowCardSmash.Core.Effects
         public bool TargetIsPlayer { get; set; }
 
         /// <summary>
+        /// 是否为全体目标（包括双方玩家）
+        /// </summary>
+        public bool TargetAll { get; set; }
+
+        /// <summary>
         /// 效果数值
         /// </summary>
         public int Value { get; set; }
@@ -84,6 +89,7 @@ namespace ShadowCardSmash.Core.Effects
             ResultEvents = new List<GameEvent>();
             TargetPlayerId = -1;
             TargetIsPlayer = false;
+            TargetAll = false;
             SecondaryValue = 0;
             Condition = string.Empty;
         }

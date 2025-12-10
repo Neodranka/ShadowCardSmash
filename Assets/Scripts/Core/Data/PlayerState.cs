@@ -88,6 +88,17 @@ namespace ShadowCardSmash.Core.Data
         /// </summary>
         public int totalSelfDamage;
 
+        /// <summary>
+        /// 本局游戏中我方玩家在自己回合受到伤害的次数（用于判断 self_damage_count >= 7）
+        /// 注意：这是伤害次数，不是回合数
+        /// </summary>
+        public int selfDamageCount;
+
+        /// <summary>
+        /// 本回合是否有随从被破坏（用于利维耶等卡牌）
+        /// </summary>
+        public bool minionDestroyedThisTurn;
+
         // ========== 卡牌区域 ==========
 
         /// <summary>
@@ -155,6 +166,8 @@ namespace ShadowCardSmash.Core.Data
                 hasBarrier = false,
                 selfDamageThisTurn = 0,
                 totalSelfDamage = 0,
+                selfDamageCount = 0,
+                minionDestroyedThisTurn = false,
                 deck = new List<int>(deckCardIds),
                 hand = new List<RuntimeCard>(),
                 graveyard = new List<int>(),
@@ -286,17 +299,28 @@ namespace ShadowCardSmash.Core.Data
             {
                 selfDamageThisTurn += actualDamage;
                 totalSelfDamage += actualDamage;
-                UnityEngine.Debug.Log($"PlayerState: 玩家{playerId}自伤{actualDamage}点 (本回合:{selfDamageThisTurn}, 累计:{totalSelfDamage})");
+                selfDamageCount++; // 增加自伤次数（每次调用算一次）
+                UnityEngine.Debug.Log($"PlayerState: 玩家{playerId}自伤{actualDamage}点 (本回合:{selfDamageThisTurn}, 累计:{totalSelfDamage}, 次数:{selfDamageCount})");
             }
             return actualDamage;
         }
 
         /// <summary>
-        /// 重置回合自伤计数
+        /// 重置回合相关计数
         /// </summary>
         public void ResetTurnSelfDamage()
         {
             selfDamageThisTurn = 0;
+            minionDestroyedThisTurn = false;
+        }
+
+        /// <summary>
+        /// 记录本回合有随从被破坏
+        /// </summary>
+        public void RecordMinionDestroyed()
+        {
+            minionDestroyedThisTurn = true;
+            UnityEngine.Debug.Log($"PlayerState: 玩家{playerId}本回合有随从被破坏");
         }
 
         /// <summary>

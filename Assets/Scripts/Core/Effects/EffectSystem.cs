@@ -83,6 +83,15 @@ namespace ShadowCardSmash.Core.Effects
         public List<GameEvent> ProcessEffect(GameState state, RuntimeCard source, int sourcePlayerId,
             EffectData effect, List<RuntimeCard> chosenTargets = null)
         {
+            return ProcessEffectWithPlayerTarget(state, source, sourcePlayerId, effect, chosenTargets, false, -1);
+        }
+
+        /// <summary>
+        /// 处理单个效果（支持玩家作为目标）
+        /// </summary>
+        public List<GameEvent> ProcessEffectWithPlayerTarget(GameState state, RuntimeCard source, int sourcePlayerId,
+            EffectData effect, List<RuntimeCard> chosenTargets, bool actionTargetIsPlayer, int actionTargetPlayerId)
+        {
             var events = new List<GameEvent>();
 
             // 检查条件
@@ -139,6 +148,17 @@ namespace ShadowCardSmash.Core.Effects
                 context.TargetIsPlayer = true;
                 context.TargetPlayerId = sourcePlayerId;
             }
+            else if (effect.targetType == TargetType.All)
+            {
+                // 全体目标（包括双方玩家）
+                context.TargetAll = true;
+            }
+            else if (effect.targetType == TargetType.PlayerChoice && actionTargetIsPlayer)
+            {
+                // 玩家选择了敌方玩家作为目标
+                context.TargetIsPlayer = true;
+                context.TargetPlayerId = actionTargetPlayerId;
+            }
 
             // 执行效果
             if (_executors.TryGetValue(effect.effectType, out var executor))
@@ -179,21 +199,51 @@ namespace ShadowCardSmash.Core.Effects
                     var unit = tile.occupant;
                     var cardData = _cardDatabase?.GetCardById(unit.cardId);
 
-                    if (cardData?.effects == null)
-                        continue;
-
-                    foreach (var effect in cardData.effects)
+                    // 处理卡牌自带的效果
+                    if (cardData?.effects != null)
                     {
-                        if (effect.trigger != trigger)
-                            continue;
-
-                        // 某些触发需要特殊处理
-                        bool shouldTrigger = ShouldTriggerEffect(trigger, unit, triggerSource, playerId, triggerPlayerId);
-
-                        if (shouldTrigger)
+                        foreach (var effect in cardData.effects)
                         {
-                            var events = ProcessEffect(state, unit, playerId, effect);
-                            allEvents.AddRange(events);
+                            if (effect.trigger != trigger)
+                                continue;
+
+                            // 某些触发需要特殊处理
+                            bool shouldTrigger = ShouldTriggerEffect(trigger, unit, triggerSource, playerId, triggerPlayerId);
+
+                            if (shouldTrigger)
+                            {
+                                var events = ProcessEffect(state, unit, playerId, effect);
+                                allEvents.AddRange(events);
+                            }
+                        }
+                    }
+
+                    // 处理被添加的效果（如渴血符文添加的效果）
+                    if (unit.addedEffects != null)
+                    {
+                        foreach (var addedEffect in unit.addedEffects)
+                        {
+                            if (addedEffect.trigger != trigger)
+                                continue;
+
+                            bool shouldTrigger = ShouldTriggerEffect(trigger, unit, triggerSource, playerId, triggerPlayerId);
+
+                            if (shouldTrigger)
+                            {
+                                // 创建临时 EffectData 来处理
+                                var effect = new EffectData
+                                {
+                                    trigger = addedEffect.trigger,
+                                    effectType = addedEffect.effectType,
+                                    targetType = addedEffect.targetType,
+                                    value = addedEffect.value
+                                };
+
+                                var events = ProcessEffect(state, unit, playerId, effect);
+                                allEvents.AddRange(events);
+
+                                UnityEngine.Debug.Log($"EffectSystem: 触发添加的效果 - {unit.instanceId} {addedEffect.effectType}");
+                            }
                         }
                     }
                 }
@@ -212,6 +262,7 @@ namespace ShadowCardSmash.Core.Effects
             {
                 case EffectTrigger.OnTurnStart:
                 case EffectTrigger.OnTurnEnd:
+                case EffectTrigger.OnOwnerTurnEnd:
                     // 只在自己的回合触发
                     return listenerPlayerId == triggerPlayerId;
 
@@ -256,6 +307,15 @@ namespace ShadowCardSmash.Core.Effects
         }
 
         /// <summary>
+        /// 根据目标类型获取有效目标列表
+        /// </summary>
+        public List<RuntimeCard> GetValidTargetsByType(GameState state, RuntimeCard source,
+            int sourcePlayerId, TargetType targetType)
+        {
+            return _targetSelector.GetValidTargets(state, source, sourcePlayerId, targetType);
+        }
+
+        /// <summary>
         /// 检查条件表达式
         /// </summary>
         private bool CheckConditionExpression(GameState state, RuntimeCard source, int sourcePlayerId, string condition)
@@ -263,6 +323,43 @@ namespace ShadowCardSmash.Core.Effects
             if (string.IsNullOrEmpty(condition)) return true;
 
             var player = state.GetPlayer(sourcePlayerId);
+
+            // 支持 && 连接的复合条件
+            if (condition.Contains("&&"))
+            {
+                var parts = condition.Split(new string[] { "&&" }, System.StringSplitOptions.RemoveEmptyEntries);
+                foreach (var part in parts)
+                {
+                    if (!CheckSingleCondition(state, source, sourcePlayerId, player, part.Trim()))
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            return CheckSingleCondition(state, source, sourcePlayerId, player, condition);
+        }
+
+        /// <summary>
+        /// 检查单个条件表达式
+        /// </summary>
+        private bool CheckSingleCondition(GameState state, RuntimeCard source, int sourcePlayerId,
+            PlayerState player, string condition)
+        {
+            // 布尔条件检查
+            switch (condition)
+            {
+                case "is_evolved":
+                    return source != null && source.isEvolved;
+                case "minion_destroyed_this_turn":
+                    return player.minionDestroyedThisTurn;
+                case "is_enemy_turn":
+                    return state.currentPlayerId != sourcePlayerId;
+                case "is_my_turn":
+                case "is_own_turn":
+                    return state.currentPlayerId == sourcePlayerId;
+            }
 
             // 解析简单条件表达式: "variable>=value" 或 "variable<=value"
             // 支持: total_self_damage>=10, self_damage_this_turn>=5 等
@@ -275,7 +372,7 @@ namespace ShadowCardSmash.Core.Effects
                     string varName = parts[0].Trim();
                     if (int.TryParse(parts[1].Trim(), out int threshold))
                     {
-                        int varValue = GetConditionVariable(player, varName);
+                        int varValue = GetConditionVariable(player, source, varName);
                         return varValue >= threshold;
                     }
                 }
@@ -288,7 +385,7 @@ namespace ShadowCardSmash.Core.Effects
                     string varName = parts[0].Trim();
                     if (int.TryParse(parts[1].Trim(), out int threshold))
                     {
-                        int varValue = GetConditionVariable(player, varName);
+                        int varValue = GetConditionVariable(player, source, varName);
                         return varValue <= threshold;
                     }
                 }
@@ -301,7 +398,7 @@ namespace ShadowCardSmash.Core.Effects
                     string varName = parts[0].Trim();
                     if (int.TryParse(parts[1].Trim(), out int threshold))
                     {
-                        int varValue = GetConditionVariable(player, varName);
+                        int varValue = GetConditionVariable(player, source, varName);
                         return varValue > threshold;
                     }
                 }
@@ -314,7 +411,7 @@ namespace ShadowCardSmash.Core.Effects
                     string varName = parts[0].Trim();
                     if (int.TryParse(parts[1].Trim(), out int threshold))
                     {
-                        int varValue = GetConditionVariable(player, varName);
+                        int varValue = GetConditionVariable(player, source, varName);
                         return varValue < threshold;
                     }
                 }
@@ -327,7 +424,7 @@ namespace ShadowCardSmash.Core.Effects
         /// <summary>
         /// 获取条件变量的值
         /// </summary>
-        private int GetConditionVariable(PlayerState player, string varName)
+        private int GetConditionVariable(PlayerState player, RuntimeCard source, string varName)
         {
             switch (varName)
             {
@@ -335,6 +432,9 @@ namespace ShadowCardSmash.Core.Effects
                     return player.totalSelfDamage;
                 case "self_damage_this_turn":
                     return player.selfDamageThisTurn;
+                case "self_damage_count":
+                    // 本局游戏中玩家在自己回合受到伤害的次数
+                    return player.selfDamageCount;
                 case "health":
                     return player.health;
                 case "max_health":
@@ -347,6 +447,10 @@ namespace ShadowCardSmash.Core.Effects
                     return player.deck.Count;
                 case "field_count":
                     return player.GetEmptyTileCount() == 0 ? PlayerState.FIELD_SIZE : PlayerState.FIELD_SIZE - player.GetEmptyTileCount();
+                case "source_attack":
+                    return source?.currentAttack ?? 0;
+                case "source_health":
+                    return source?.currentHealth ?? 0;
                 default:
                     UnityEngine.Debug.LogWarning($"EffectSystem: 未知条件变量: {varName}");
                     return 0;

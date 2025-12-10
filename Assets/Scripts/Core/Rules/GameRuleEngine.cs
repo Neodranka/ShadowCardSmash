@@ -381,12 +381,16 @@ namespace ShadowCardSmash.Core.Rules
 
             // 获取目标
             List<RuntimeCard> targets = null;
+            RuntimeCard spellTarget = null;  // 保存法术的原始目标
+            bool targetIsPlayer = action.targetIsPlayer;
+            int targetPlayerId = action.targetPlayerId;
+
             if (action.targetInstanceId >= 0)
             {
-                var target = _currentState.FindCardByInstanceId(action.targetInstanceId);
-                if (target != null)
+                spellTarget = _currentState.FindCardByInstanceId(action.targetInstanceId);
+                if (spellTarget != null)
                 {
-                    targets = new List<RuntimeCard> { target };
+                    targets = new List<RuntimeCard> { spellTarget };
                 }
             }
 
@@ -395,9 +399,16 @@ namespace ShadowCardSmash.Core.Rules
             {
                 if (effect.trigger == EffectTrigger.OnPlay)
                 {
-                    // 创建临时上下文处理玩家目标
-                    var effectEvents = _effectSystem.ProcessEffect(
-                        _currentState, null, action.playerId, effect, targets);
+                    // 对于需要从目标获取值的效果，传入法术目标
+                    List<RuntimeCard> effectTargets = targets;
+                    if (effect.parameters != null && effect.parameters.Contains("value_from:target_cost") && spellTarget != null)
+                    {
+                        // 即使效果的目标类型是玩家，也传入法术目标以便获取费用信息
+                        effectTargets = new List<RuntimeCard> { spellTarget };
+                    }
+
+                    var effectEvents = _effectSystem.ProcessEffectWithPlayerTarget(
+                        _currentState, null, action.playerId, effect, effectTargets, targetIsPlayer, targetPlayerId);
                     events.AddRange(effectEvents);
                 }
             }
@@ -408,8 +419,15 @@ namespace ShadowCardSmash.Core.Rules
                 UnityEngine.Debug.Log($"GameRuleEngine: 执行法术增幅效果 - {cardData.cardName}");
                 foreach (var effect in cardData.enhanceEffects)
                 {
-                    var effectEvents = _effectSystem.ProcessEffect(
-                        _currentState, null, action.playerId, effect, targets);
+                    // 对于需要从目标获取值的效果，传入法术目标
+                    List<RuntimeCard> effectTargets = targets;
+                    if (effect.parameters != null && effect.parameters.Contains("value_from:target_cost") && spellTarget != null)
+                    {
+                        effectTargets = new List<RuntimeCard> { spellTarget };
+                    }
+
+                    var effectEvents = _effectSystem.ProcessEffectWithPlayerTarget(
+                        _currentState, null, action.playerId, effect, effectTargets, targetIsPlayer, targetPlayerId);
                     events.AddRange(effectEvents);
                 }
             }
@@ -666,16 +684,26 @@ namespace ShadowCardSmash.Core.Rules
             var card = player.hand[handIndex];
             var cardData = _cardDatabase?.GetCardById(card.cardId);
 
-            if (cardData == null || cardData.effects.Count == 0)
+            if (cardData == null)
                 return new List<RuntimeCard>();
 
-            // 检查第一个需要目标的效果
-            foreach (var effect in cardData.effects)
+            // 如果卡牌定义了 validTargets，使用卡牌级别的目标类型
+            // 这样可以正确限制目标（如 SingleEnemy 只能选敌方随从）
+            if (cardData.requiresTarget)
             {
-                if (effect.trigger == EffectTrigger.OnPlay &&
-                    _effectSystem.RequiresTargetChoice(effect))
+                return _effectSystem.GetValidTargetsByType(_currentState, null, playerId, cardData.validTargets);
+            }
+
+            // 回退到检查效果的目标类型
+            if (cardData.effects != null && cardData.effects.Count > 0)
+            {
+                foreach (var effect in cardData.effects)
                 {
-                    return _effectSystem.GetValidTargets(_currentState, null, playerId, effect);
+                    if (effect.trigger == EffectTrigger.OnPlay &&
+                        _effectSystem.RequiresTargetChoice(effect))
+                    {
+                        return _effectSystem.GetValidTargets(_currentState, null, playerId, effect);
+                    }
                 }
             }
 

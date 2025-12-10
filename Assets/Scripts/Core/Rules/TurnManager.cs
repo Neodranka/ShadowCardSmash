@@ -165,7 +165,11 @@ namespace ShadowCardSmash.Core.Rules
 
             state.phase = GamePhase.TurnEnd;
 
-            // 触发回合结束效果
+            // 触发己方回合结束效果（OnOwnerTurnEnd - 只对当前玩家的单位触发）
+            var ownerTurnEndEvents = _effectSystem.TriggerEffects(state, EffectTrigger.OnOwnerTurnEnd, null, playerId);
+            events.AddRange(ownerTurnEndEvents);
+
+            // 触发通用回合结束效果（OnTurnEnd - 可能对所有单位触发）
             var triggerEvents = _effectSystem.TriggerEffects(state, EffectTrigger.OnTurnEnd, null, playerId);
             events.AddRange(triggerEvents);
 

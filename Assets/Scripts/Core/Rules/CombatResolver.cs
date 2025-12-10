@@ -48,7 +48,11 @@ namespace ShadowCardSmash.Core.Rules
             int defenderDamage = defender.currentAttack;
 
             // 攻击者对防守者造成伤害
+            // 记录攻击前血量用于计算吸血
+            int defenderHealthBefore = defender.currentHealth;
             int actualAttackerDamage = defender.TakeDamage(attackerDamage);
+            int defenderHealthAfter = defender.currentHealth; // 可能为负数
+
             events.Add(new DamageEvent(
                 attackerPlayerId,
                 attacker.instanceId,
@@ -58,22 +62,27 @@ namespace ShadowCardSmash.Core.Rules
                 -1
             ));
 
-            // 吸血效果：攻击者造成伤害后回复玩家生命
+            // 吸血效果：回复量 = 攻击前血量 - 攻击后血量（血量可以变成负数）
             if (attacker.hasDrain && actualAttackerDamage > 0 && !attacker.isSilenced)
             {
+                int drainAmount = defenderHealthBefore - defenderHealthAfter;
                 var attackerOwner = state.GetPlayer(attackerPlayerId);
-                attackerOwner.Heal(actualAttackerDamage);
+                attackerOwner.Heal(drainAmount);
                 events.Add(new DrainEvent(
                     attackerPlayerId,
                     attacker.instanceId,
                     actualAttackerDamage,
-                    actualAttackerDamage
+                    drainAmount
                 ));
-                UnityEngine.Debug.Log($"CombatResolver: 吸血效果 - 玩家{attackerPlayerId}回复{actualAttackerDamage}生命");
+                UnityEngine.Debug.Log($"CombatResolver: 吸血效果 - 玩家{attackerPlayerId}回复{drainAmount}生命 (目标血量: {defenderHealthBefore} -> {defenderHealthAfter})");
             }
 
             // 防守者对攻击者造成伤害（反击）
+            // 记录攻击前血量用于计算吸血
+            int attackerHealthBefore = attacker.currentHealth;
             int actualDefenderDamage = attacker.TakeDamage(defenderDamage);
+            int attackerHealthAfter = attacker.currentHealth; // 可能为负数
+
             events.Add(new DamageEvent(
                 defender.ownerId,
                 defender.instanceId,
@@ -86,15 +95,16 @@ namespace ShadowCardSmash.Core.Rules
             // 防守者的吸血效果
             if (defender.hasDrain && actualDefenderDamage > 0 && !defender.isSilenced)
             {
+                int drainAmount = attackerHealthBefore - attackerHealthAfter;
                 var defenderOwner = state.GetPlayer(defender.ownerId);
-                defenderOwner.Heal(actualDefenderDamage);
+                defenderOwner.Heal(drainAmount);
                 events.Add(new DrainEvent(
                     defender.ownerId,
                     defender.instanceId,
                     actualDefenderDamage,
-                    actualDefenderDamage
+                    drainAmount
                 ));
-                UnityEngine.Debug.Log($"CombatResolver: 吸血效果 - 玩家{defender.ownerId}回复{actualDefenderDamage}生命");
+                UnityEngine.Debug.Log($"CombatResolver: 吸血效果 - 玩家{defender.ownerId}回复{drainAmount}生命 (目标血量: {attackerHealthBefore} -> {attackerHealthAfter})");
             }
 
             // 触发受伤效果（只有实际受到伤害才触发）
@@ -341,6 +351,10 @@ namespace ShadowCardSmash.Core.Rules
                     owner.graveyard.Add(defender.cardId);
                     tile.RemoveUnit();
 
+                    // 记录本回合有随从被破坏（双方都记录）
+                    state.GetPlayer(0).RecordMinionDestroyed();
+                    state.GetPlayer(1).RecordMinionDestroyed();
+
                     events.Add(new UnitDestroyedEvent(
                         attacker.ownerId,
                         defender.instanceId,
@@ -379,6 +393,10 @@ namespace ShadowCardSmash.Core.Rules
                     var owner = state.GetPlayer(attacker.ownerId);
                     owner.graveyard.Add(attacker.cardId);
                     tile.RemoveUnit();
+
+                    // 记录本回合有随从被破坏（双方都记录）
+                    state.GetPlayer(0).RecordMinionDestroyed();
+                    state.GetPlayer(1).RecordMinionDestroyed();
 
                     events.Add(new UnitDestroyedEvent(
                         defender.ownerId,

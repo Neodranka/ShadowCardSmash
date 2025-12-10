@@ -600,7 +600,7 @@ namespace ShadowCardSmash.UI.Battle
             var cardData = _cardDatabase?.GetCardById(card.cardId);
             if (cardData != null && cardDetailPopup != null)
             {
-                cardDetailPopup.Show(card, cardData);
+                cardDetailPopup.Show(card, cardData, myState);
             }
         }
 
@@ -627,15 +627,32 @@ namespace ShadowCardSmash.UI.Battle
 
                 case BattleUIState.CardSelected:
                 case BattleUIState.SelectingTile:
-                    // 选择放置位置
-                    if (!tile.isOpponentTile && tile.IsEmpty && tile.IsValidPlacement)
+                    // 获取当前选中的卡牌信息
+                    var myState = gameController.GetLocalPlayerState();
+                    CardData selectedCardData = null;
+                    if (myState != null && _selectedHandIndex >= 0 && _selectedHandIndex < myState.hand.Count)
                     {
+                        var selectedCard = myState.hand[_selectedHandIndex];
+                        selectedCardData = _cardDatabase?.GetCardById(selectedCard.cardId);
+                    }
+
+                    if (selectedCardData != null && selectedCardData.cardType == CardType.Spell)
+                    {
+                        // 法术卡：点击任意格子都可以释放（点击整个场地区域）
                         PlaceCardOnTile(tile);
                     }
                     else
                     {
-                        // 点击了无效位置，取消选择
-                        CancelCurrentAction();
+                        // 随从/护符：需要选择空格子
+                        if (!tile.isOpponentTile && tile.IsEmpty && tile.IsValidPlacement)
+                        {
+                            PlaceCardOnTile(tile);
+                        }
+                        else
+                        {
+                            // 点击了无效位置，取消选择
+                            CancelCurrentAction();
+                        }
                     }
                     break;
 
@@ -690,7 +707,12 @@ namespace ShadowCardSmash.UI.Battle
 
                 if (cardData != null && cardDetailPopup != null)
                 {
-                    cardDetailPopup.Show(cardView.RuntimeCard, cardData);
+                    // 获取卡牌所有者的状态
+                    var state = gameController?.CurrentState;
+                    int ownerId = cardView.RuntimeCard?.ownerId ?? _localPlayerId;
+                    var ownerState = state?.GetPlayer(ownerId);
+
+                    cardDetailPopup.Show(cardView.RuntimeCard, cardData, ownerState);
                     Debug.Log($"BattleUIController: 右键显示格子{tile.tileIndex}的卡牌详情 - {cardData.cardName}");
                 }
             }
@@ -708,13 +730,48 @@ namespace ShadowCardSmash.UI.Battle
         {
             if (!gameController.IsMyTurn) return;
 
-            // 只有在选择攻击目标状态下，且对手是有效目标时才能攻击
+            // 在选择攻击目标状态下，攻击敌方玩家
             if (_currentState == BattleUIState.SelectingAttackTarget &&
                 opponentHandArea != null &&
                 opponentHandArea.IsValidAttackTarget)
             {
                 ExecuteAttackOnPlayer();
+                return;
             }
+
+            // 在选择法术目标状态下，选择敌方玩家为目标
+            if (_currentState == BattleUIState.SelectingTarget &&
+                opponentHandArea != null &&
+                opponentHandArea.IsValidAttackTarget)
+            {
+                ExecuteSpellOnPlayer();
+            }
+        }
+
+        private void ExecuteSpellOnPlayer()
+        {
+            if (_selectedHandIndex < 0) return;
+
+            // 获取卡牌信息
+            var myState = gameController.GetLocalPlayerState();
+            if (myState == null || _selectedHandIndex >= myState.hand.Count) return;
+
+            var card = myState.hand[_selectedHandIndex];
+            var cardData = _cardDatabase?.GetCardById(card.cardId);
+
+            int opponentId = 1 - _localPlayerId;
+
+            // 判断是否可以使用强化
+            bool useEnhance = cardData != null && cardData.HasEnhance() && myState.mana >= cardData.enhanceCost;
+
+            bool success = gameController.TryPlayCard(_selectedHandIndex, 0, -1, true, opponentId, useEnhance);
+
+            if (success)
+            {
+                Debug.Log($"BattleUIController: 对敌方玩家使用法术 (强化: {useEnhance})");
+            }
+
+            CancelCurrentAction();
         }
 
         private void OnEvolveClicked()
@@ -752,33 +809,104 @@ namespace ShadowCardSmash.UI.Battle
             _selectedHandIndex = handIndex;
             myHandArea?.SelectCard(handIndex);
 
-            // 高亮可放置的格子
-            HighlightValidPlacementTiles();
+            // 获取卡牌信息
+            var myState = gameController.GetLocalPlayerState();
+            if (myState == null || handIndex >= myState.hand.Count) return;
 
-            SetState(BattleUIState.SelectingTile);
-            Debug.Log($"BattleUIController: 选中手牌{handIndex}");
+            var card = myState.hand[handIndex];
+            var cardData = _cardDatabase?.GetCardById(card.cardId);
+
+            if (cardData == null)
+            {
+                Debug.LogWarning($"BattleUIController: 找不到卡牌数据 cardId={card.cardId}");
+                return;
+            }
+
+            // 根据卡牌类型决定行为
+            if (cardData.cardType == CardType.Spell)
+            {
+                // 法术卡：检查是否需要选择目标
+                var validTargets = gameController.GetValidTargetsForCard(handIndex);
+
+                if (cardData.requiresTarget)
+                {
+                    // 需要选择目标的法术：高亮可选目标
+                    HighlightSpellTargets(validTargets);
+
+                    // 如果目标类型包括敌方玩家（SingleEnemyOrPlayer），也高亮敌方玩家区域
+                    // SingleEnemy 只能选择敌方随从，不能选择玩家
+                    if (cardData.validTargets == TargetType.SingleEnemyOrPlayer)
+                    {
+                        if (opponentHandArea != null)
+                        {
+                            opponentHandArea.SetValidAttackTarget(true);
+                        }
+                    }
+
+                    SetState(BattleUIState.SelectingTarget);
+                    Debug.Log($"BattleUIController: 选中指向性法术{handIndex}，等待选择目标，有效目标数: {validTargets.Count}");
+                }
+                else
+                {
+                    // 不需要目标的法术：高亮整个场地（显示可释放区域）
+                    HighlightSpellCastArea();
+                    SetState(BattleUIState.SelectingTile); // 用这个状态表示"点击任意位置释放"
+                    Debug.Log($"BattleUIController: 选中非指向性法术{handIndex}，点击任意位置释放");
+                }
+            }
+            else if (cardData.cardType == CardType.Minion || cardData.cardType == CardType.Amulet)
+            {
+                // 随从/护符卡：高亮可放置的格子
+                HighlightValidPlacementTiles();
+                SetState(BattleUIState.SelectingTile);
+                Debug.Log($"BattleUIController: 选中随从/护符{handIndex}");
+            }
         }
 
         private void PlaceCardOnTile(TileSlotController tile)
         {
             if (_selectedHandIndex < 0) return;
 
-            // 获取卡牌信息，检查是否需要选择目标
+            // 获取卡牌信息
             var myState = gameController.GetLocalPlayerState();
             if (myState == null || _selectedHandIndex >= myState.hand.Count) return;
 
             var card = myState.hand[_selectedHandIndex];
             var cardData = _cardDatabase?.GetCardById(card.cardId);
 
-            // TODO: 检查是否需要选择目标
-            // 暂时直接使用
-            bool success = gameController.TryPlayCard(_selectedHandIndex, tile.tileIndex);
-
-            if (success)
+            if (cardData == null)
             {
-                Debug.Log($"BattleUIController: 打出卡牌到格子{tile.tileIndex}");
+                CancelCurrentAction();
+                return;
+            }
+
+            // 判断是否可以使用强化（费用足够且有强化效果）
+            bool useEnhance = cardData.HasEnhance() && myState.mana >= cardData.enhanceCost;
+
+            bool success;
+
+            if (cardData.cardType == CardType.Spell)
+            {
+                // 法术卡不需要格子索引，tileIndex 设为 0
+                success = gameController.TryPlayCard(_selectedHandIndex, 0, -1, false, -1, useEnhance);
+
+                if (success)
+                {
+                    Debug.Log($"BattleUIController: 释放法术 {cardData.cardName} (强化: {useEnhance})");
+                }
             }
             else
+            {
+                // 随从/护符需要放置在格子上
+                success = gameController.TryPlayCard(_selectedHandIndex, tile.tileIndex, -1, false, -1, useEnhance);
+
+                if (success)
+                {
+                    Debug.Log($"BattleUIController: 打出卡牌到格子{tile.tileIndex} (强化: {useEnhance})");
+                }
+            }
+
+            if (!success)
             {
                 Debug.LogWarning($"BattleUIController: 打出卡牌失败");
             }
@@ -789,6 +917,13 @@ namespace ShadowCardSmash.UI.Battle
         private void ExecuteCardWithTarget(TileSlotController targetTile)
         {
             if (_selectedHandIndex < 0) return;
+
+            // 获取卡牌信息
+            var myState = gameController.GetLocalPlayerState();
+            if (myState == null || _selectedHandIndex >= myState.hand.Count) return;
+
+            var card = myState.hand[_selectedHandIndex];
+            var cardData = _cardDatabase?.GetCardById(card.cardId);
 
             int targetInstanceId = -1;
             bool targetIsPlayer = false;
@@ -803,11 +938,14 @@ namespace ShadowCardSmash.UI.Battle
                 }
             }
 
-            bool success = gameController.TryPlayCard(_selectedHandIndex, 0, targetInstanceId, targetIsPlayer, targetPlayerId);
+            // 判断是否可以使用强化
+            bool useEnhance = cardData != null && cardData.HasEnhance() && myState.mana >= cardData.enhanceCost;
+
+            bool success = gameController.TryPlayCard(_selectedHandIndex, 0, targetInstanceId, targetIsPlayer, targetPlayerId, useEnhance);
 
             if (success)
             {
-                Debug.Log($"BattleUIController: 打出卡牌，目标: {targetInstanceId}");
+                Debug.Log($"BattleUIController: 打出卡牌，目标: {targetInstanceId} (强化: {useEnhance})");
             }
 
             CancelCurrentAction();
@@ -939,6 +1077,74 @@ namespace ShadowCardSmash.UI.Battle
                     _validTileIndices.Add(i);
                 }
             }
+        }
+
+        /// <summary>
+        /// 高亮法术释放区域（整个场地亮绿光）
+        /// </summary>
+        private void HighlightSpellCastArea()
+        {
+            // 高亮所有我方格子
+            if (myTiles != null)
+            {
+                foreach (var tile in myTiles)
+                {
+                    tile?.SetValidPlacementTarget(true);
+                }
+            }
+
+            // 高亮所有对手格子
+            if (opponentTiles != null)
+            {
+                foreach (var tile in opponentTiles)
+                {
+                    tile?.SetValidPlacementTarget(true);
+                }
+            }
+
+            Debug.Log("BattleUIController: 高亮法术释放区域");
+        }
+
+        /// <summary>
+        /// 高亮法术的有效目标
+        /// </summary>
+        private void HighlightSpellTargets(List<RuntimeCard> validTargets)
+        {
+            _validTargetInstanceIds.Clear();
+
+            foreach (var target in validTargets)
+            {
+                _validTargetInstanceIds.Add(target.instanceId);
+
+                // 在所有战场格子中找到目标
+                if (myTiles != null)
+                {
+                    foreach (var tile in myTiles)
+                    {
+                        var occupant = tile?.GetOccupant();
+                        if (occupant?.RuntimeCard != null && occupant.RuntimeCard.instanceId == target.instanceId)
+                        {
+                            tile.SetValidAttackTarget(true);
+                            break;
+                        }
+                    }
+                }
+
+                if (opponentTiles != null)
+                {
+                    foreach (var tile in opponentTiles)
+                    {
+                        var occupant = tile?.GetOccupant();
+                        if (occupant?.RuntimeCard != null && occupant.RuntimeCard.instanceId == target.instanceId)
+                        {
+                            tile.SetValidAttackTarget(true);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            Debug.Log($"BattleUIController: 高亮法术目标，数量: {validTargets.Count}");
         }
 
         private void HighlightValidAttackTargets()

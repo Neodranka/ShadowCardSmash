@@ -111,6 +111,11 @@ namespace ShadowCardSmash.Core.Data
         public List<BuffData> buffs;
 
         /// <summary>
+        /// 被添加的额外效果（如渴血符文添加的回合结束效果）
+        /// </summary>
+        public List<AddedEffectData> addedEffects;
+
+        /// <summary>
         /// 默认构造函数
         /// </summary>
         public RuntimeCard()

@@ -197,7 +197,7 @@ namespace ShadowCardSmash.Core.Cards
                 tags = new List<string> { "技术" },
                 description = "选择一个敌方随从或玩家，对其造成3点伤害。\n强化 4：己方玩家的生命值回复5点。",
                 requiresTarget = true,
-                validTargets = TargetType.SingleEnemy, // 包括玩家
+                validTargets = TargetType.SingleEnemyOrPlayer, // 包括敌方玩家
                 effects = new List<EffectData>
                 {
                     new EffectData
@@ -576,8 +576,8 @@ namespace ShadowCardSmash.Core.Cards
                         trigger = EffectTrigger.OnPlay,
                         effectType = EffectType.DestroyAllOther, // 破坏所有其他随从
                         targetType = TargetType.AllMinions,
-                        parameters = new List<string> { "heal_by_count" },
-                        condition = "total_self_damage >= 15"
+                        // heal_if_condition 参数表示只在满足条件时治疗
+                        parameters = new List<string> { "heal_if_condition:total_self_damage>=15" }
                     }
                 }
             };

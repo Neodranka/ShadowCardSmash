@@ -55,7 +55,7 @@ namespace ShadowCardSmash.Core.Rules
         }
 
         /// <summary>
-        /// 检查随从是否可以被进化
+        /// 检查随从是否可以被进化（使用EP手动进化）
         /// </summary>
         public bool CanEvolveMinion(GameState state, RuntimeCard minion, int playerId)
         {
@@ -67,6 +67,12 @@ namespace ShadowCardSmash.Core.Rules
             // 必须是随从（不能是护符）
             var cardData = _cardDatabase?.GetCardById(minion.cardId);
             if (cardData == null || cardData.cardType != CardType.Minion)
+            {
+                return false;
+            }
+
+            // 检查是否可以用EP进化（如利维耶不能用EP进化）
+            if (!cardData.canEvolveWithEP)
             {
                 return false;
             }
@@ -143,6 +149,20 @@ namespace ShadowCardSmash.Core.Rules
             // 触发进化效果
             if (!minion.isSilenced)
             {
+                // 处理 evolveEffects 中的效果
+                if (cardData.evolveEffects != null)
+                {
+                    foreach (var effect in cardData.evolveEffects)
+                    {
+                        if (effect.trigger == EffectTrigger.OnEvolve)
+                        {
+                            var effectEvents = _effectSystem.ProcessEffect(state, minion, playerId, effect);
+                            events.AddRange(effectEvents);
+                        }
+                    }
+                }
+
+                // 也检查普通效果列表中的 OnEvolve
                 var evolveEvents = _effectSystem.TriggerEffects(state, EffectTrigger.OnEvolve, minion, playerId);
                 events.AddRange(evolveEvents);
             }

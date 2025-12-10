@@ -30,6 +30,10 @@ namespace ShadowCardSmash.Core.Effects.Executors
                 var owner = context.GameState.GetPlayer(ownerId);
                 owner.graveyard.Add(cardId);
 
+                // 记录本回合有随从被破坏（双方都记录）
+                context.GameState.GetPlayer(0).RecordMinionDestroyed();
+                context.GameState.GetPlayer(1).RecordMinionDestroyed();
+
                 // 生成破坏事件
                 context.AddEvent(new UnitDestroyedEvent(
                     context.SourcePlayerId,
