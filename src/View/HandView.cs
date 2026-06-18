@@ -22,9 +22,11 @@ public partial class HandView : HBoxContainer
 
     public void Rebind(IReadOnlyList<RuntimeCard> hand, ICardDatabase db)
     {
-        // Remove from tree immediately (QueueFree alone defers to end of frame, leaving stale slots).
-        foreach (var child in GetChildren().ToArray())
+        // Remove from tree immediately, backwards so indices stay valid.
+        // QueueFree alone defers to end of frame, which leaves stale slots in the HBox layout this frame.
+        for (int i = GetChildCount() - 1; i >= 0; i--)
         {
+            var child = GetChild(i);
             RemoveChild(child);
             child.QueueFree();
         }

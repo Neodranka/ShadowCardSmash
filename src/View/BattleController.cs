@@ -48,9 +48,11 @@ public partial class BattleController : Node
         var rng = new DeterministicRng(seed: (int)Time.GetTicksMsec(), counter: 0);
         _loop = new GameLoop(state, _registry, rng);
 
-        var sample = new CardId(2001); // BloodSeller
+        // V1 demo deck: half BloodSeller (1/1 OnPlay self-damage + draw), half TrainingDummy (0/3 Ward,
+        // no OnPlay) so the player can see the hand count actually shrink when they drop a Dummy.
         var deck = new List<CardId>();
-        for (int i = 0; i < 40; i++) deck.Add(sample);
+        for (int i = 0; i < 20; i++) deck.Add(new CardId(2001));
+        for (int i = 0; i < 20; i++) deck.Add(new CardId(1001));
 
         var first = new GameInitializer.SeatConfig(deck, HeroClass.Vampire, null);
         var second = new GameInitializer.SeatConfig(deck, HeroClass.Vampire, null);

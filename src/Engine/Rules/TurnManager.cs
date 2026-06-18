@@ -26,12 +26,14 @@ public static class TurnManager
         ctx.Loop.Publish(new ManaChangedEvent(side, p.Mana, p.MaxMana), ctx);
 
         // Refresh attack permissions for surviving minions.
+        // SummonedThisTurn is cleared FIRST so that a minion played on the previous owner-turn is fully
+        // available now (Hearthstone-style: summoning sickness lasts until your next turn begins).
         foreach (var tile in p.Field)
         {
             if (tile.Occupant is not RuntimeCard m) continue;
-            m.AttacksThisTurn = 0;
-            m.CanAttackThisTurn = !m.SummonedThisTurn || m.HasKeyword(Keyword.Rush) || m.HasKeyword(Keyword.Storm);
             m.SummonedThisTurn = false;
+            m.AttacksThisTurn = 0;
+            m.CanAttackThisTurn = true;
         }
 
         // Tick amulet countdowns BEFORE draw (GDD §10 step 1).
