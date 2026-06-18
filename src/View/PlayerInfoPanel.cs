@@ -22,7 +22,7 @@ public partial class PlayerInfoPanel : PanelContainer
 
     public override void _Ready()
     {
-        CustomMinimumSize = new Vector2(300, 100);
+        CustomMinimumSize = new Vector2(300, 70);
         BuildUi();
         GuiInput += OnGuiInput;
     }

@@ -14,7 +14,8 @@ namespace ShadowCardSmash.View;
 /// </summary>
 public partial class BoardView : Control
 {
-    public const int Margin = 24;
+    public const int Margin = 16;
+    public const int RowSeparation = 4;
 
     [Signal] public delegate void HandCardClickedEventHandler(int sideIndex, int instanceId);
     [Signal] public delegate void TileClickedEventHandler(int sideIndex, int tileIndex);
@@ -49,7 +50,7 @@ public partial class BoardView : Control
             AnchorLeft = 0, AnchorTop = 0, AnchorRight = 1, AnchorBottom = 1,
             OffsetLeft = Margin, OffsetTop = Margin, OffsetRight = -Margin, OffsetBottom = -Margin,
         };
-        root.AddThemeConstantOverride("separation", 8);
+        root.AddThemeConstantOverride("separation", RowSeparation);
         AddChild(root);
 
         // Top: enemy info.
@@ -85,7 +86,7 @@ public partial class BoardView : Control
         MyInfo.HeroClicked += idx => EmitSignal(SignalName.HeroClicked, idx);
         bottomRow.AddChild(MyInfo);
 
-        EndTurnButton = new Button { Text = "End Turn", CustomMinimumSize = new Vector2(160, 80) };
+        EndTurnButton = new Button { Text = "结束回合", CustomMinimumSize = new Vector2(140, 64) };
         EndTurnButton.Pressed += () => EmitSignal(SignalName.EndTurnClicked);
         bottomRow.AddChild(EndTurnButton);
 

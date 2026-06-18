@@ -10,8 +10,8 @@ namespace ShadowCardSmash.View;
 /// </summary>
 public partial class CardView : PanelContainer
 {
-    public const int CardWidth = 150;
-    public const int CardHeight = 210;
+    public const int CardWidth = 140;
+    public const int CardHeight = 170;
 
     [Signal] public delegate void ClickedEventHandler(int instanceId);
 
@@ -125,13 +125,17 @@ public partial class CardView : PanelContainer
 
         if (script.CardType == CardType.Minion)
         {
-            _stats.Text = $"⚔ {card.CurrentAttack}    ♥ {card.CurrentHealth}";
+            // In hand the RuntimeCard has not been instantiated yet (CurrentAttack/Health are 0), show base stats.
+            int atk = onField ? card.CurrentAttack : script.BaseAttack;
+            int hp = onField ? card.CurrentHealth : script.BaseHealth;
+            _stats.Text = $"⚔ {atk}    ♥ {hp}";
             _stats.Visible = true;
         }
         else if (script.CardType == CardType.Amulet)
         {
-            _stats.Text = card.Countdown >= 0 ? $"⏳ {card.Countdown}" : "";
-            _stats.Visible = card.Countdown >= 0;
+            int cd = onField ? card.Countdown : script.InitialCountdown;
+            _stats.Text = cd >= 0 ? $"⏳ {cd}" : "";
+            _stats.Visible = cd >= 0;
         }
         else
         {
@@ -187,7 +191,12 @@ public partial class CardView : PanelContainer
             BuildTypeTagLine(s),
         };
         if (s.CardType == CardType.Minion)
-            lines.Add($"⚔{card.CurrentAttack}  ♥{card.CurrentHealth}/{card.MaxHealth}");
+        {
+            int atk = card.Zone == Zone.Field ? card.CurrentAttack : s.BaseAttack;
+            int curHp = card.Zone == Zone.Field ? card.CurrentHealth : s.BaseHealth;
+            int maxHp = card.Zone == Zone.Field ? card.MaxHealth : s.BaseHealth;
+            lines.Add($"⚔{atk}  ♥{curHp}/{maxHp}");
+        }
         var desc = BuildDescription(s, card);
         if (!string.IsNullOrEmpty(desc)) lines.Add("");
         if (!string.IsNullOrEmpty(desc)) lines.Add(desc);
