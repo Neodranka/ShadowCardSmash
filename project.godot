@@ -14,7 +14,7 @@ config/name="ShadowCardSmash"
 config/description="Godot rewrite of ShadowCardSmash card game."
 config/version="0.1.0"
 run/main_scene="res://scenes/MainMenu.tscn"
-config/features=PackedStringArray("4.3", "C#", "Forward Plus")
+config/features=PackedStringArray("4.6", "C#", "Forward Plus")
 config/icon="res://art/ui/icon.svg"
 
 [dotnet]
