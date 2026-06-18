@@ -158,17 +158,20 @@ public class EndToEndGameFlowTests
     }
 
     [Fact]
-    public void DeckValidator_RejectsWrongClassAndOversize()
+    public void DeckValidator_RejectsViolations()
     {
-        var deck = BuildDeck(new CardId(2001)); // Vampire cards in Neutral deck
-        var bad = DeckValidator.Validate(deck, HeroClass.ClassB, Registry);
-        Assert.False(bad.IsValid);
+        // Wrong class: Vampire card in a non-Vampire deck.
+        var wrongClass = DeckValidator.Validate(BuildDeck(new CardId(2001)), HeroClass.ClassB, Registry);
+        Assert.False(wrongClass.IsValid);
 
-        var listOfThree = new List<CardId> { new(2001), new(2001), new(2001) };
-        var tooSmall = DeckValidator.Validate(listOfThree, HeroClass.Vampire, Registry);
+        // Wrong size: only 3 cards.
+        var tooSmall = DeckValidator.Validate(
+            new List<CardId> { new(2001), new(2001), new(2001) }, HeroClass.Vampire, Registry);
         Assert.False(tooSmall.IsValid);
 
-        var ok = DeckValidator.Validate(BuildDeck(new CardId(2001)), HeroClass.Vampire, Registry);
-        Assert.True(ok.IsValid);
+        // Same-card limit: 40 copies of one card violates the 3-copy maximum.
+        var tooManyCopies = DeckValidator.Validate(BuildDeck(new CardId(2001)), HeroClass.Vampire, Registry);
+        Assert.False(tooManyCopies.IsValid);
+        Assert.Contains("Too many copies", tooManyCopies.Reason);
     }
 }

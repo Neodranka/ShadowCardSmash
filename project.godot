@@ -17,17 +17,12 @@ run/main_scene="res://scenes/MainMenu.tscn"
 config/features=PackedStringArray("4.6", "C#", "Forward Plus")
 config/icon="res://art/ui/icon.svg"
 
-[dotnet]
-
-project/assembly_name="ShadowCardSmash"
-
 [display]
 
 window/size/viewport_width=1920
 window/size/viewport_height=1080
 window/stretch/mode="canvas_items"
-window/stretch/aspect="keep"
 
-[rendering]
+[dotnet]
 
-renderer/rendering_method="forward_plus"
+project/assembly_name="ShadowCardSmash"
