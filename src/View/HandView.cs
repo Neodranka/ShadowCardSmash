@@ -34,9 +34,16 @@ public partial class HandView : HBoxContainer
         {
             var cv = new CardView();
             AddChild(cv);
-            cv.Bind(card, db.Get(card.Card), onField: false);
-            if (!ShowFaces) cv.Modulate = new Color(0.3f, 0.3f, 0.4f);
-            cv.Clicked += OnCardClicked;
+            if (ShowFaces)
+            {
+                cv.Bind(card, db.Get(card.Card), onField: false);
+                cv.Clicked += OnCardClicked;
+            }
+            else
+            {
+                // Opponent hand in hot seat: render as opaque card backs (no text leak).
+                cv.BindFaceDown();
+            }
         }
     }
 

@@ -117,11 +117,14 @@ public partial class CardView : PanelContainer
         Card = card.Card;
         IsOnField = onField;
 
+        _name.Visible = true; _cost.Visible = true; _typeTags.Visible = true;
+        _description.Visible = true; _keywords.Visible = true;
+
         _name.Text = script.Name;
         _cost.Text = script.Cost.ToString();
         _typeTags.Text = BuildTypeTagLine(script);
         _description.Text = BuildDescription(script, card);
-        _keywords.Text = BuildKeywordLine(card);
+        _keywords.Text = BuildKeywordLine(card, script, onField);
 
         if (script.CardType == CardType.Minion)
         {
@@ -143,7 +146,7 @@ public partial class CardView : PanelContainer
             _stats.Visible = false;
         }
 
-        ApplyAccentColors(card, script);
+        ApplyAccentColors(card, script, onField);
         TooltipText = BuildTooltip(script, card);
     }
 
@@ -170,16 +173,19 @@ public partial class CardView : PanelContainer
 
     private static string BuildDescription(ICardScript s, RuntimeCard card) => s.Description;
 
-    private static string BuildKeywordLine(RuntimeCard card)
+    private static string BuildKeywordLine(RuntimeCard card, ICardScript script, bool onField)
     {
+        // In hand, keywords reflect the card-as-printed (script.InitialKeywords).
+        // On field, they reflect the current runtime state (which can be silenced / gained later).
+        var keywords = onField ? card.Keywords : script.InitialKeywords;
         var parts = new List<string>();
-        if (card.HasKeyword(Keyword.Ward)) parts.Add("【守护】");
-        if (card.HasKeyword(Keyword.Rush)) parts.Add("【突进】");
-        if (card.HasKeyword(Keyword.Storm)) parts.Add("【疾驰】");
-        if (card.HasKeyword(Keyword.Barrier)) parts.Add("【护盾】");
-        if (card.HasKeyword(Keyword.Stealth)) parts.Add("【潜行】");
-        if (card.IsEvolved) parts.Add("✦进化");
-        if (card.IsSilenced) parts.Add("✕沉默");
+        if ((keywords & Keyword.Ward) == Keyword.Ward) parts.Add("【守护】");
+        if ((keywords & Keyword.Rush) == Keyword.Rush) parts.Add("【突进】");
+        if ((keywords & Keyword.Storm) == Keyword.Storm) parts.Add("【疾驰】");
+        if ((keywords & Keyword.Barrier) == Keyword.Barrier) parts.Add("【护盾】");
+        if ((keywords & Keyword.Stealth) == Keyword.Stealth) parts.Add("【潜行】");
+        if (onField && card.IsEvolved) parts.Add("✦进化");
+        if (onField && card.IsSilenced) parts.Add("✕沉默");
         return string.Join(" ", parts);
     }
 
@@ -200,12 +206,12 @@ public partial class CardView : PanelContainer
         var desc = BuildDescription(s, card);
         if (!string.IsNullOrEmpty(desc)) lines.Add("");
         if (!string.IsNullOrEmpty(desc)) lines.Add(desc);
-        var kw = BuildKeywordLine(card);
+        var kw = BuildKeywordLine(card, s, onField: card.Zone == Zone.Field);
         if (!string.IsNullOrEmpty(kw)) lines.Add(kw);
         return string.Join("\n", lines);
     }
 
-    private void ApplyAccentColors(RuntimeCard card, ICardScript script)
+    private void ApplyAccentColors(RuntimeCard card, ICardScript script, bool onField)
     {
         // Class-tinted base border.
         var baseBorder = script.HeroClass switch
@@ -220,13 +226,18 @@ public partial class CardView : PanelContainer
         int borderW = 2;
         var borderColor = baseBorder;
 
-        // Ward gets a thick gold border so it's hard to miss on the field.
-        if (card.HasKeyword(Keyword.Ward))
+        // Look at script for hand cards (printed value), runtime card for field cards.
+        var effectiveKeywords = onField ? card.Keywords : script.InitialKeywords;
+        bool hasWard = (effectiveKeywords & Keyword.Ward) == Keyword.Ward;
+
+        _stylebox.BgColor = new Color(0.18f, 0.12f, 0.22f);
+
+        if (hasWard)
         {
             borderColor = new Color(1f, 0.85f, 0.3f);
             borderW = 5;
         }
-        else if (card.IsEvolved)
+        else if (onField && card.IsEvolved)
         {
             borderColor = new Color(1f, 0.55f, 1f);
             borderW = 4;
@@ -238,7 +249,30 @@ public partial class CardView : PanelContainer
         _stylebox.BorderWidthLeft = borderW;
         _stylebox.BorderWidthRight = borderW;
 
-        Modulate = card.IsSilenced ? new Color(0.55f, 0.55f, 0.55f) : new Color(1, 1, 1);
+        Modulate = (onField && card.IsSilenced) ? new Color(0.55f, 0.55f, 0.55f) : new Color(1, 1, 1);
+    }
+
+    /// <summary>
+    /// Render as an opaque card back: no text, just a generic pattern. Used for the opponent's hand in hot seat.
+    /// </summary>
+    public void BindFaceDown()
+    {
+        BuildUi();
+        Instance = InstanceId.None;
+        Card = CardId.None;
+        IsOnField = false;
+
+        _name.Visible = false; _cost.Visible = false; _typeTags.Visible = false;
+        _description.Visible = false; _keywords.Visible = false; _stats.Visible = false;
+
+        _stylebox.BgColor = new Color(0.12f, 0.10f, 0.18f);
+        _stylebox.BorderColor = new Color(0.45f, 0.4f, 0.55f);
+        _stylebox.BorderWidthTop = 3;
+        _stylebox.BorderWidthBottom = 3;
+        _stylebox.BorderWidthLeft = 3;
+        _stylebox.BorderWidthRight = 3;
+        Modulate = new Color(1, 1, 1);
+        TooltipText = "对手手牌";
     }
 
     private void OnGuiInput(InputEvent e)
