@@ -17,11 +17,12 @@ public partial class BattleController : Node
     private BoardView _board = null!;
 
     // Input state machine.
-    private enum Mode { Idle, AwaitTarget }
+    private enum Mode { Idle, AwaitPlayTarget, AwaitAttackTarget }
     private Mode _mode = Mode.Idle;
     private InstanceId _selectedHandInstance;
     private CardId _selectedCardId;
     private TargetSpec _selectedSpec;
+    private InstanceId _selectedAttacker;
 
     public PlayerSide LocalSide => _loop.State.CurrentPlayer; // hot-seat: always view current player
 
@@ -34,6 +35,7 @@ public partial class BattleController : Node
 
         _board.HandCardClicked += OnHandCardClicked;
         _board.TileClicked += OnTileClicked;
+        _board.MinionClicked += OnMinionClicked;
         _board.HeroClicked += OnHeroClicked;
         _board.EndTurnClicked += OnEndTurnClicked;
 
@@ -70,12 +72,15 @@ public partial class BattleController : Node
         if (card is null) return;
         var script = _registry.Get(card.Card);
 
-        if (_mode == Mode.AwaitTarget && _selectedHandInstance.Value == instanceId)
+        // Toggle off if user clicks the same card again.
+        if (_mode == Mode.AwaitPlayTarget && _selectedHandInstance.Value == instanceId)
         {
-            _mode = Mode.Idle;
-            _board.SetStatus("");
+            ResetMode();
             return;
         }
+
+        // Switching from another mode resets first.
+        ResetMode();
 
         _selectedHandInstance = card.Instance;
         _selectedCardId = card.Card;
@@ -83,9 +88,9 @@ public partial class BattleController : Node
 
         if (script.CardType == CardType.Minion || script.CardType == CardType.Amulet)
         {
-            _mode = Mode.AwaitTarget;
-            _board.SetStatus($"Pick a friendly tile for {script.Name}");
-            HighlightEmptyTiles(LocalSide);
+            _mode = Mode.AwaitPlayTarget;
+            _board.SetStatus($"选择一个空格子放置 {script.Name}");
+            HighlightFriendlyEmptyTiles();
             return;
         }
 
@@ -95,31 +100,75 @@ public partial class BattleController : Node
             TrySubmit(new PlayCardAction(LocalSide, card.Instance, null, null, null));
             return;
         }
-        _mode = Mode.AwaitTarget;
-        _board.SetStatus($"Pick a target for {script.Name}");
+        _mode = Mode.AwaitPlayTarget;
+        _board.SetStatus($"为 {script.Name} 选择一个目标");
     }
 
     private void OnTileClicked(int sideIndex, int tileIndex)
     {
-        if (_mode != Mode.AwaitTarget || _loop.IsGameOver) return;
+        if (_loop.IsGameOver) return;
         var side = (PlayerSide)sideIndex;
-        var script = _registry.Get(_selectedCardId);
 
-        switch (script.CardType)
+        if (_mode == Mode.AwaitPlayTarget)
         {
-            case CardType.Minion:
-            case CardType.Amulet:
-                if (side != LocalSide) { _board.SetStatus("That tile is on the wrong side."); return; }
-                TrySubmit(new PlayCardAction(LocalSide, _selectedHandInstance, tileIndex, null, null));
-                return;
+            var script = _registry.Get(_selectedCardId);
+            switch (script.CardType)
+            {
+                case CardType.Minion:
+                case CardType.Amulet:
+                    if (side != LocalSide) { _board.SetStatus("必须放在己方场地"); return; }
+                    TrySubmit(new PlayCardAction(LocalSide, _selectedHandInstance, tileIndex, null, null));
+                    return;
+                case CardType.Spell:
+                    if (_loop.State.GetPlayer(side).Field[tileIndex].Occupant is { } occ)
+                        TrySubmit(new PlayCardAction(LocalSide, _selectedHandInstance, null, occ.Instance, null));
+                    return;
+            }
+        }
+        // Clicking empty space in Idle or Attack mode just cancels selection.
+        ResetMode();
+    }
 
-            case CardType.Spell:
-                // Spell aimed at a minion-on-tile.
-                if (_loop.State.GetPlayer(side).Field[tileIndex].Occupant is { } occ)
-                {
-                    TrySubmit(new PlayCardAction(LocalSide, _selectedHandInstance, null, occ.Instance, null));
-                }
+    private void OnMinionClicked(int sideIndex, int instanceId)
+    {
+        if (_loop.IsGameOver) return;
+        var side = (PlayerSide)sideIndex;
+        var instance = new InstanceId(instanceId);
+
+        // Spell aimed at a minion takes priority.
+        if (_mode == Mode.AwaitPlayTarget)
+        {
+            var script = _registry.Get(_selectedCardId);
+            if (script.CardType == CardType.Spell)
+            {
+                TrySubmit(new PlayCardAction(LocalSide, _selectedHandInstance, null, instance, null));
+            }
+            return;
+        }
+
+        // Attack target.
+        if (_mode == Mode.AwaitAttackTarget)
+        {
+            if (side == LocalSide.Opponent())
+                TrySubmit(new AttackAction(LocalSide, _selectedAttacker, instance, null));
+            else
+                ResetMode(); // reclicking own field cancels
+            return;
+        }
+
+        // Idle: clicking own minion → enter attack mode if it can attack.
+        if (side == LocalSide)
+        {
+            var attacker = _loop.State.GetPlayer(side).FindOnField(instance);
+            if (attacker is null) return;
+            if (!attacker.CanAttackThisTurn || attacker.CurrentAttack <= 0)
+            {
+                _board.SetStatus("此随从本回合无法攻击");
                 return;
+            }
+            _selectedAttacker = instance;
+            _mode = Mode.AwaitAttackTarget;
+            _board.SetStatus("选择攻击目标（敌方随从或英雄）");
         }
     }
 
@@ -128,27 +177,25 @@ public partial class BattleController : Node
         if (_loop.IsGameOver) return;
         var side = (PlayerSide)sideIndex;
 
-        if (_mode == Mode.AwaitTarget)
+        if (_mode == Mode.AwaitAttackTarget && side == LocalSide.Opponent())
         {
-            // Spell aimed at hero?
-            var script = _registry.Get(_selectedCardId);
-            if (script.CardType == CardType.Spell)
-            {
-                TrySubmit(new PlayCardAction(LocalSide, _selectedHandInstance, null, null, side));
-            }
+            TrySubmit(new AttackAction(LocalSide, _selectedAttacker, null, side));
             return;
         }
 
-        // Idle: clicking the enemy hero is a face attack. V1 simplification:
-        // require the player to first click a minion to make it the attacker, but we have no minion-selection mode yet.
-        // For V1 we wire face attacks via the minion-on-tile being clicked; clicking the hero alone is a no-op.
-        _board.SetStatus(side == LocalSide.Opponent() ? "Click a friendly minion first to attack." : "");
+        if (_mode == Mode.AwaitPlayTarget)
+        {
+            var script = _registry.Get(_selectedCardId);
+            if (script.CardType == CardType.Spell)
+                TrySubmit(new PlayCardAction(LocalSide, _selectedHandInstance, null, null, side));
+        }
     }
 
     private void OnEndTurnClicked()
     {
         if (_loop.IsGameOver) return;
         if (_loop.State.Phase != GamePhase.Main) return;
+        ResetMode();
         TrySubmit(new EndTurnAction(LocalSide));
     }
 
@@ -160,21 +207,30 @@ public partial class BattleController : Node
         }
         catch (InvalidActionException e)
         {
-            _board.SetStatus($"Invalid: {e.Message}");
-            _mode = Mode.Idle;
+            _board.SetStatus($"非法操作: {e.Message}");
+            ResetMode();
             Rebind();
             return;
         }
-        _mode = Mode.Idle;
+        ResetMode();
         Rebind();
     }
 
     private void Rebind() => _board.Rebind(_loop.State, _registry, LocalSide);
 
-    private void HighlightEmptyTiles(PlayerSide side)
+    private void ResetMode()
     {
-        var tiles = side == PlayerSide.First ? _board.MyTiles : _board.EnemyTiles;
-        var p = _loop.State.GetPlayer(side);
+        _mode = Mode.Idle;
+        _selectedHandInstance = InstanceId.None;
+        _selectedAttacker = InstanceId.None;
+        _board.SetStatus("");
+        _board.ClearHighlights();
+    }
+
+    private void HighlightFriendlyEmptyTiles()
+    {
+        var tiles = _board.MyTiles; // MyTiles now carry LocalSide after Rebind
+        var p = _loop.State.GetPlayer(LocalSide);
         for (int i = 0; i < tiles.Length; i++) tiles[i].Highlight(p.Field[i].IsEmpty);
     }
 }
