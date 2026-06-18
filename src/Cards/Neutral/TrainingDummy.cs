@@ -10,6 +10,7 @@ namespace ShadowCardSmash.Cards.Neutral;
 public sealed class TrainingDummy : MinionCard
 {
     public override string Name => "训练假人";
+    public override string Description => "守护。一面 0/3 的肉墙，没有攻击力但能挡刀。";
     public override int Cost => 1;
     public override HeroClass HeroClass => HeroClass.Neutral;
     public override Rarity Rarity => Rarity.Bronze;

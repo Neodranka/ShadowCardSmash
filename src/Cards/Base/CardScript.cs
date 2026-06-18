@@ -18,6 +18,7 @@ public abstract class CardScript : ICardScript
     public CardId Id { get; }
 
     public abstract string Name { get; }
+    public virtual string Description => "";
     public abstract int Cost { get; }
     public abstract CardType CardType { get; }
     public abstract HeroClass HeroClass { get; }

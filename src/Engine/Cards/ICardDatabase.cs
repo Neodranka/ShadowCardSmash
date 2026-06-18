@@ -21,6 +21,7 @@ public interface ICardScript
 {
     CardId Id { get; }
     string Name { get; }
+    string Description { get; }
     int Cost { get; }
     CardType CardType { get; }
     HeroClass HeroClass { get; }

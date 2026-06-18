@@ -11,6 +11,7 @@ namespace ShadowCardSmash.Cards.Vampire;
 public sealed class Bite : SpellCard
 {
     public override string Name => "撕咬";
+    public override string Description => "对一个敌方随从造成2点伤害，恢复2点我方生命值。";
     public override int Cost => 1;
     public override HeroClass HeroClass => HeroClass.Vampire;
     public override Rarity Rarity => Rarity.Bronze;

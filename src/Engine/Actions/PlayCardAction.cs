@@ -16,12 +16,12 @@ public sealed record PlayCardAction(
 {
     public ActionResult Validate(GameState state)
     {
-        if (state.Phase != GamePhase.Main) return ActionResult.Fail("Not in main phase.");
-        if (state.CurrentPlayer != Issuer) return ActionResult.Fail("Not your turn.");
+        if (state.Phase != GamePhase.Main) return ActionResult.Fail("不在主要阶段");
+        if (state.CurrentPlayer != Issuer) return ActionResult.Fail("不是你的回合");
 
         var p = state.GetPlayer(Issuer);
         var card = p.Hand.FirstOrDefault(c => c.Instance == HandInstance);
-        if (card is null) return ActionResult.Fail("Card not in hand.");
+        if (card is null) return ActionResult.Fail("该卡不在你的手牌中");
         return ActionResult.Ok();
     }
 
@@ -32,17 +32,17 @@ public sealed record PlayCardAction(
         var card = p.Hand.First(c => c.Instance == HandInstance);
         var script = ctx.CardDatabase.Get(card.Card);
 
-        if (p.Mana < script.Cost) throw new InvalidActionException("Not enough mana.");
+        if (p.Mana < script.Cost) throw new InvalidActionException("费用不足");
 
         // Type-specific placement / target gating.
         switch (script.CardType)
         {
             case CardType.Minion:
             case CardType.Amulet:
-                if (!TileIndex.HasValue) throw new InvalidActionException("Tile index required for minion/amulet.");
+                if (!TileIndex.HasValue) throw new InvalidActionException("需要指定一个格子");
                 if (TileIndex.Value < 0 || TileIndex.Value >= PlayerState.FieldSize)
-                    throw new InvalidActionException("Tile out of range.");
-                if (!p.Field[TileIndex.Value].IsEmpty) throw new InvalidActionException("Tile occupied.");
+                    throw new InvalidActionException("格子序号越界");
+                if (!p.Field[TileIndex.Value].IsEmpty) throw new InvalidActionException("该格子已被占据");
                 break;
             case CardType.Spell:
                 ValidateSpellTarget(state, script);
@@ -114,20 +114,20 @@ public sealed record PlayCardAction(
             case TargetSpec.None:
                 return;
             case TargetSpec.EnemyPlayer:
-                if (TargetPlayer != Issuer.Opponent()) throw new InvalidActionException("Spell needs enemy hero target.");
+                if (TargetPlayer != Issuer.Opponent()) throw new InvalidActionException("此法术需要选择敌方英雄");
                 return;
             case TargetSpec.AllyPlayer:
-                if (TargetPlayer != Issuer) throw new InvalidActionException("Spell needs ally hero target.");
+                if (TargetPlayer != Issuer) throw new InvalidActionException("此法术需要选择我方英雄");
                 return;
             case TargetSpec.SingleAnyMinion:
             case TargetSpec.SingleEnemyMinion:
             case TargetSpec.SingleAllyMinion:
-                if (!TargetMinion.HasValue) throw new InvalidActionException("Spell needs a minion target.");
-                var m = ResolvePickedMinion(state) ?? throw new InvalidActionException("Target minion missing.");
+                if (!TargetMinion.HasValue) throw new InvalidActionException("此法术需要选择一个随从");
+                var m = ResolvePickedMinion(state) ?? throw new InvalidActionException("目标随从已不存在");
                 if (script.PlayTarget == TargetSpec.SingleEnemyMinion && m.Owner == Issuer)
-                    throw new InvalidActionException("Target must be enemy minion.");
+                    throw new InvalidActionException("此法术目标必须是敌方随从");
                 if (script.PlayTarget == TargetSpec.SingleAllyMinion && m.Owner != Issuer)
-                    throw new InvalidActionException("Target must be ally minion.");
+                    throw new InvalidActionException("此法术目标必须是我方随从");
                 return;
             default:
                 return;

@@ -163,14 +163,15 @@ public partial class BattleController : Node
         {
             var attacker = _loop.State.GetPlayer(side).FindOnField(instance);
             if (attacker is null) return;
-            if (!attacker.CanAttackThisTurn || attacker.CurrentAttack <= 0)
-            {
-                _board.SetStatus("此随从本回合无法攻击");
-                return;
-            }
+
+            string? blocker = DiagnoseAttackBlocker(attacker);
+            if (blocker is not null) { _board.SetStatus(blocker); return; }
+
             _selectedAttacker = instance;
             _mode = Mode.AwaitAttackTarget;
-            _board.SetStatus("选择攻击目标（敌方随从或英雄）");
+            _board.SetStatus(CombatResolver.EnemyHasWard(_loop.State, LocalSide)
+                ? "对方有守护，必须先攻击守护随从"
+                : "选择攻击目标（敌方随从或英雄）");
         }
     }
 
@@ -234,5 +235,15 @@ public partial class BattleController : Node
         var tiles = _board.MyTiles; // MyTiles now carry LocalSide after Rebind
         var p = _loop.State.GetPlayer(LocalSide);
         for (int i = 0; i < tiles.Length; i++) tiles[i].Highlight(p.Field[i].IsEmpty);
+    }
+
+    private static string? DiagnoseAttackBlocker(RuntimeCard m)
+    {
+        if (m.CurrentAttack <= 0) return "攻击力为 0，无法攻击";
+        if (m.AttacksThisTurn > 0) return "本回合已经攻击过";
+        if (m.SummonedThisTurn && !m.HasKeyword(Keyword.Rush) && !m.HasKeyword(Keyword.Storm))
+            return "召唤晕眩中，下回合才能攻击";
+        if (!m.CanAttackThisTurn) return "此随从本回合不能攻击";
+        return null;
     }
 }

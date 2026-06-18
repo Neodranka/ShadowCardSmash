@@ -11,6 +11,7 @@ namespace ShadowCardSmash.Cards.Vampire;
 public sealed class BloodSeller : MinionCard
 {
     public override string Name => "卖血者";
+    public override string Description => "开幕：对我方造成2点伤害，抽1张牌。";
     public override int Cost => 1;
     public override HeroClass HeroClass => HeroClass.Vampire;
     public override Rarity Rarity => Rarity.Bronze;
