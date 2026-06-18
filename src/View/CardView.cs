@@ -10,8 +10,8 @@ namespace ShadowCardSmash.View;
 /// </summary>
 public partial class CardView : PanelContainer
 {
-    public const int CardWidth = 140;
-    public const int CardHeight = 170;
+    public const int CardWidth = 150;
+    public const int CardHeight = 190;
 
     [Signal] public delegate void ClickedEventHandler(int instanceId);
 

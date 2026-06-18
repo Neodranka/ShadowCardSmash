@@ -53,44 +53,43 @@ public partial class BoardView : Control
         root.AddThemeConstantOverride("separation", RowSeparation);
         AddChild(root);
 
-        // Top: enemy info.
-        EnemyInfo = new PlayerInfoPanel { SizeFlagsHorizontal = SizeFlags.ShrinkCenter };
+        // Symmetric layout: every row spans the full width, mirrored top↔bottom about the central separator.
+        EnemyInfo = new PlayerInfoPanel { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         EnemyInfo.HeroClicked += idx => EmitSignal(SignalName.HeroClicked, idx);
         root.AddChild(EnemyInfo);
 
-        // Enemy hand (face-down).
         EnemyHand = new HandView { ShowFaces = false };
         EnemyHand.CardSelected += iid => EmitSignal(SignalName.HandCardClicked, (int)EnemyHand.Side, iid);
         root.AddChild(EnemyHand);
 
-        // Enemy field.
         EnemyTiles = BuildFieldRow(root);
 
         var sep = new HSeparator();
+        sep.AddThemeConstantOverride("separation", 12);
         root.AddChild(sep);
 
-        // My field.
         MyTiles = BuildFieldRow(root);
 
-        // My hand.
         MyHand = new HandView { ShowFaces = true };
         MyHand.CardSelected += iid => EmitSignal(SignalName.HandCardClicked, (int)MyHand.Side, iid);
         root.AddChild(MyHand);
 
-        // Bottom row: my info + end-turn.
-        var bottomRow = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        bottomRow.AddThemeConstantOverride("separation", 16);
-        root.AddChild(bottomRow);
-
         MyInfo = new PlayerInfoPanel { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         MyInfo.HeroClicked += idx => EmitSignal(SignalName.HeroClicked, idx);
-        bottomRow.AddChild(MyInfo);
+        root.AddChild(MyInfo);
 
-        EndTurnButton = new Button { Text = "结束回合", CustomMinimumSize = new Vector2(140, 64) };
+        // End-Turn floats over the bottom-right corner so it never breaks the mirror symmetry above.
+        EndTurnButton = new Button
+        {
+            Text = "结束回合",
+            CustomMinimumSize = new Vector2(140, 56),
+            AnchorLeft = 1, AnchorTop = 1, AnchorRight = 1, AnchorBottom = 1,
+            OffsetLeft = -156, OffsetTop = -72, OffsetRight = -16, OffsetBottom = -16,
+        };
         EndTurnButton.Pressed += () => EmitSignal(SignalName.EndTurnClicked);
-        bottomRow.AddChild(EndTurnButton);
+        AddChild(EndTurnButton);
 
-        // Status overlay.
+        // Status overlay — center of viewport.
         StatusLabel = new Label
         {
             AnchorLeft = 0.5f, AnchorTop = 0.5f, AnchorRight = 0.5f, AnchorBottom = 0.5f,
