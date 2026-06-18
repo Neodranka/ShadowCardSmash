@@ -1,0 +1,72 @@
+using ShadowCardSmash.Domain;
+
+namespace ShadowCardSmash.Engine;
+
+/// <summary>
+/// Handle passed to IGameAction.Apply and to every card-script hook.
+/// Encapsulates: state, RNG, the loop that owns the event chain, plus the "source / chosen targets" of
+/// whatever caused this context to be created (so card scripts can reference 'self' and 'picked target').
+///
+/// Effect primitives are exposed as instance methods on this class — it is the single facade card scripts use.
+/// Adding a new primitive: add a method here that calls EffectPrimitives.X(this, ...).
+/// </summary>
+public sealed class GameContext
+{
+    public GameState State { get; }
+    public IRng Rng { get; }
+    public GameLoop Loop { get; }
+    public ICardDatabase CardDatabase { get; }
+
+    public PlayerSide SourceSide { get; internal set; }
+    public RuntimeCard? Source { get; internal set; }
+
+    public RuntimeCard? PickedTarget { get; internal set; }
+    public PlayerSide? PickedPlayerTarget { get; internal set; }
+    public int? PickedTileIndex { get; internal set; }
+
+    public GameContext(GameState state, IRng rng, GameLoop loop, ICardDatabase cardDb, PlayerSide sourceSide)
+    {
+        State = state;
+        Rng = rng;
+        Loop = loop;
+        CardDatabase = cardDb;
+        SourceSide = sourceSide;
+    }
+
+    public PlayerState Owner => State.GetPlayer(SourceSide);
+    public PlayerState Enemy => State.GetPlayer(SourceSide.Opponent());
+
+    /// <summary>
+    /// Returns a context for invoking another card's hooks. Shares state/loop/rng but re-roots Source.
+    /// Used by EffectPrimitives to dispatch OnDamaged / OnDeath into the *target's* script.
+    /// </summary>
+    public GameContext WithSource(RuntimeCard newSource) => new(State, Rng, Loop, CardDatabase, newSource.Owner)
+    {
+        Source = newSource,
+        PickedTarget = PickedTarget,
+        PickedPlayerTarget = PickedPlayerTarget,
+        PickedTileIndex = PickedTileIndex,
+    };
+
+    // === Effect primitives (facade) ===
+    public bool Damage(RuntimeCard target, int amount) => EffectPrimitives.DamageMinion(this, target, amount);
+    public void Damage(PlayerSide target, int amount) => EffectPrimitives.DamagePlayer(this, target, amount);
+    public void SelfDamage(PlayerSide target, int amount) => EffectPrimitives.SelfDamagePlayer(this, target, amount);
+    public void Heal(RuntimeCard target, int amount) => EffectPrimitives.HealMinion(this, target, amount);
+    public void Heal(PlayerSide target, int amount) => EffectPrimitives.HealPlayer(this, target, amount);
+    public void Draw(PlayerSide side, int count) => EffectPrimitives.Draw(this, side, count);
+    public void Discard(PlayerSide side, RuntimeCard card) => EffectPrimitives.Discard(this, side, card);
+    public InstanceId? Summon(CardId cardId, PlayerSide side, int? tileIndex = null)
+        => EffectPrimitives.Summon(this, cardId, side, tileIndex);
+    public void Buff(RuntimeCard target, int atk, int hp, int duration = -1)
+        => EffectPrimitives.Buff(this, target, atk, hp, duration);
+    public void GainKeyword(RuntimeCard target, Keyword kw) => EffectPrimitives.GainKeyword(this, target, kw);
+    public void Silence(RuntimeCard target) => EffectPrimitives.Silence(this, target);
+    public void Destroy(RuntimeCard target) => EffectPrimitives.Destroy(this, target);
+    public void Vanish(RuntimeCard target) => EffectPrimitives.Vanish(this, target);
+    public void GainMana(PlayerSide side, int amount, bool thisTurnOnly)
+        => EffectPrimitives.GainMana(this, side, amount, thisTurnOnly);
+    public void AddToHand(PlayerSide side, CardId cardId) => EffectPrimitives.AddToHand(this, side, cardId);
+    public void ApplyTileEffect(PlayerSide side, int tileIndex, string key, int value, int duration)
+        => EffectPrimitives.ApplyTileEffect(this, side, tileIndex, key, value, duration);
+}
