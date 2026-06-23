@@ -31,6 +31,12 @@ public partial class CardDetailPanel : PanelContainer
         MouseFilter = MouseFilterEnum.Ignore;
         BuildUi();
         Visible = false;
+
+        // Float above everything: pile columns within the BoardView and PilePopup overlay outside it.
+        // Absolute z (z_as_relative=false) escapes both parent and sibling order.
+        TopLevel = true;
+        ZIndex = 2048;
+        ZAsRelative = false;
     }
 
     private void BuildUi()

@@ -17,8 +17,8 @@ public partial class BoardView : Control
     public const int Margin = 16;
     public const int RowSeparation = 4;
     public const int EdgeColumnWidth = 156;
-    public const int EdgeInfoGap = 90;   // vertical space reserved for info bar + margin
-    public const int CenterGap = 32;     // gap between pile column edge and the central separator
+    public const int EdgeInfoGap = 70;   // vertical space reserved for info bar + margin (info ~50 + 16 + small breath)
+    public const int CenterGap = 36;     // gap between pile column edge and the central separator
 
     [Signal] public delegate void HandCardClickedEventHandler(int sideIndex, int instanceId);
     [Signal] public delegate void TileClickedEventHandler(int sideIndex, int tileIndex);
