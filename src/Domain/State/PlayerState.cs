@@ -3,6 +3,7 @@ namespace ShadowCardSmash.Domain;
 public sealed class PlayerState
 {
     public const int FieldSize = 6;
+    public const int TerrainSlotIndex = 6; // virtual tile index for the terrain slot — not part of Field[].
     public const int HandLimit = 10;
     public const int StartingHealth = 40;
 
@@ -23,6 +24,7 @@ public sealed class PlayerState
     public List<RuntimeCard> Deck = new();
     public List<RuntimeCard> Hand = new();
     public TileState[] Field = CreateEmptyField();
+    public TileState TerrainSlot = new() { Index = TerrainSlotIndex };
     public List<RuntimeCard> Graveyard = new();
     public List<RuntimeCard> Vanished = new();
 
@@ -67,6 +69,15 @@ public sealed class PlayerState
         return null;
     }
 
+    /// <summary>Find a card on either Field[0..5] or the dedicated TerrainSlot.</summary>
+    public RuntimeCard? FindOnFieldOrTerrain(InstanceId id)
+    {
+        var f = FindOnField(id);
+        if (f is not null) return f;
+        if (TerrainSlot.Occupant is { } t && t.Instance == id) return t;
+        return null;
+    }
+
     public PlayerState Clone()
     {
         var copy = new PlayerState
@@ -89,6 +100,7 @@ public sealed class PlayerState
         foreach (var c in Deck) copy.Deck.Add(c.Clone());
         foreach (var c in Hand) copy.Hand.Add(c.Clone());
         for (int i = 0; i < Field.Length; i++) copy.Field[i] = Field[i].Clone();
+        copy.TerrainSlot = TerrainSlot.Clone();
         foreach (var c in Graveyard) copy.Graveyard.Add(c.Clone());
         foreach (var c in Vanished) copy.Vanished.Add(c.Clone());
         return copy;

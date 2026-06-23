@@ -16,8 +16,10 @@ public partial class TileSlotView : PanelContainer
 
     public int TileIndex { get; set; }
     public PlayerSide Side { get; set; }
+    public bool IsTerrain { get; set; }
 
     public CardView? Occupant { get; private set; }
+    private StyleBoxFlat _sb = null!;
     private bool _builtUi;
 
     public override void _Ready()
@@ -31,14 +33,17 @@ public partial class TileSlotView : PanelContainer
     {
         if (_builtUi) return;
         _builtUi = true;
-        var sb = new StyleBoxFlat
+        _sb = new StyleBoxFlat
         {
-            BgColor = new Color(0.1f, 0.1f, 0.14f, 0.5f),
-            BorderColor = new Color(0.4f, 0.4f, 0.45f),
-            BorderWidthTop = 1, BorderWidthBottom = 1, BorderWidthLeft = 1, BorderWidthRight = 1,
+            BgColor = IsTerrain ? new Color(0.18f, 0.12f, 0.10f, 0.55f) : new Color(0.1f, 0.1f, 0.14f, 0.5f),
+            BorderColor = IsTerrain ? new Color(0.85f, 0.65f, 0.3f) : new Color(0.4f, 0.4f, 0.45f),
+            BorderWidthTop = IsTerrain ? 2 : 1,
+            BorderWidthBottom = IsTerrain ? 2 : 1,
+            BorderWidthLeft = IsTerrain ? 2 : 1,
+            BorderWidthRight = IsTerrain ? 2 : 1,
             CornerRadiusTopLeft = 4, CornerRadiusTopRight = 4, CornerRadiusBottomLeft = 4, CornerRadiusBottomRight = 4,
         };
-        AddThemeStyleboxOverride("panel", sb);
+        AddThemeStyleboxOverride("panel", _sb);
     }
 
     public void SetOccupant(CardView? cv)

@@ -28,7 +28,9 @@ public partial class BoardView : Control
     public PlayerInfoPanel EnemyInfo = null!;
     public HandView EnemyHand = null!;
     public TileSlotView[] EnemyTiles = null!;
+    public TileSlotView EnemyTerrain = null!;
     public TileSlotView[] MyTiles = null!;
+    public TileSlotView MyTerrain = null!;
     public HandView MyHand = null!;
     public PlayerInfoPanel MyInfo = null!;
     public Button EndTurnButton = null!;
@@ -88,7 +90,8 @@ public partial class BoardView : Control
             root, isTopSide: true,
             EnemyInfo, EnemyHand,
             placeholderUpper: EnemyTopLeftSlot, leftFlankLower: EnemyGrave,
-            placeholderUpper2: EnemyTopRightSlot, rightFlankLower: EnemyDeck);
+            placeholderUpper2: EnemyTopRightSlot, rightFlankLower: EnemyDeck,
+            out EnemyTerrain);
 
         // Vertical Spacer + narrow HSep + Spacer: pushes EnemySection up and MySection down, HSep at viewport center.
         root.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill });
@@ -117,7 +120,8 @@ public partial class BoardView : Control
             root, isTopSide: false,
             MyInfo, MyHand,
             placeholderUpper: MyTopLeftSlot, leftFlankLower: MyDeck,
-            placeholderUpper2: MyTopRightSlot, rightFlankLower: MyGrave);
+            placeholderUpper2: MyTopRightSlot, rightFlankLower: MyGrave,
+            out MyTerrain);
 
         // End Turn anchored to right edge, vertical center. Sits in the gap between flanks (above MyRightFlank,
         // below EnemyRightFlank) since sections shrink to their natural height and don't reach the screen center.
@@ -156,7 +160,8 @@ public partial class BoardView : Control
         Container parent, bool isTopSide,
         PlayerInfoPanel infoPanel, HandView handView,
         PileView placeholderUpper, PileView leftFlankLower,
-        PileView placeholderUpper2, PileView rightFlankLower)
+        PileView placeholderUpper2, PileView rightFlankLower,
+        out TileSlotView terrainSlot)
     {
         var section = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         section.AddThemeConstantOverride("separation", 8);
@@ -179,7 +184,7 @@ public partial class BoardView : Control
         };
         middle.AddThemeConstantOverride("separation", RowSeparation);
         var tiles = new TileSlotView[PlayerState.FieldSize];
-        var fieldRow = BuildBareFieldRow(tiles);
+        var fieldRow = BuildBareFieldRow(tiles, out terrainSlot);
         if (isTopSide)
         {
             middle.AddChild(infoPanel);
@@ -206,7 +211,7 @@ public partial class BoardView : Control
         return tiles;
     }
 
-    private HBoxContainer BuildBareFieldRow(TileSlotView[] tilesOut)
+    private HBoxContainer BuildBareFieldRow(TileSlotView[] tilesOut, out TileSlotView terrainOut)
     {
         var row = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ShrinkCenter };
         row.AddThemeConstantOverride("separation", 8);
@@ -217,6 +222,14 @@ public partial class BoardView : Control
             row.AddChild(tile);
             tilesOut[i] = tile;
         }
+
+        // Small visual gap, then the dedicated terrain slot with a distinct (amber) border.
+        row.AddChild(new Control { CustomMinimumSize = new Vector2(24, 0) });
+        terrainOut = new TileSlotView { TileIndex = PlayerState.TerrainSlotIndex, IsTerrain = true };
+        var capturedTerrain = terrainOut;
+        terrainOut.TileClicked += idx => EmitSignal(SignalName.TileClicked, (int)capturedTerrain.Side, idx);
+        row.AddChild(terrainOut);
+
         return row;
     }
 
@@ -244,6 +257,8 @@ public partial class BoardView : Control
         EnemyHand.Side = localSide.Opponent();
         foreach (var t in MyTiles) t.Side = localSide;
         foreach (var t in EnemyTiles) t.Side = localSide.Opponent();
+        MyTerrain.Side = localSide;
+        EnemyTerrain.Side = localSide.Opponent();
 
         MyDeck.Side = localSide; MyGrave.Side = localSide;
         MyTopLeftSlot.Side = localSide; MyTopRightSlot.Side = localSide;
@@ -268,6 +283,8 @@ public partial class BoardView : Control
         _fieldCardLookup.Clear();
         RebindRow(MyTiles, me, db, OnMinionClicked, _fieldCardLookup);
         RebindRow(EnemyTiles, enemy, db, OnMinionClicked, _fieldCardLookup);
+        RebindTerrainSlot(MyTerrain, me.TerrainSlot, db, _fieldCardLookup);
+        RebindTerrainSlot(EnemyTerrain, enemy.TerrainSlot, db, _fieldCardLookup);
 
         EndTurnButton.Disabled = !myTurn || state.Phase != GamePhase.Main;
         StatusLabel.Text = state.Phase switch
@@ -302,6 +319,20 @@ public partial class BoardView : Control
             cv.HoverExited += _ => DetailPanel.HoverHide();
             lookup[occ.Instance] = cv;
         }
+    }
+
+    private void RebindTerrainSlot(TileSlotView slot, TileState terrain, ICardDatabase db,
+        Dictionary<InstanceId, CardView> lookup)
+    {
+        slot.Highlight(false);
+        if (terrain.Occupant is not { } occ) { slot.SetOccupant(null); return; }
+        var cv = new CardView();
+        slot.SetOccupant(cv);
+        cv.Bind(occ, db.Get(occ.Card), onField: true);
+        cv.Clicked += iid => OnMinionClicked(slot, iid);
+        cv.HoverEntered += iid => OnFieldCardHovered(iid);
+        cv.HoverExited += _ => DetailPanel.HoverHide();
+        lookup[occ.Instance] = cv;
     }
 
     private void OnHandCardHovered(int instanceId)

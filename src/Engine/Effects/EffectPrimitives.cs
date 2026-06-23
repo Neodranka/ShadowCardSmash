@@ -221,13 +221,19 @@ public static class EffectPrimitives
                 break;
             }
         }
+        // Also clear the dedicated terrain slot if the target was the terrain occupant.
+        if (tileIdx is null && p.TerrainSlot.Occupant?.Instance == target.Instance)
+        {
+            tileIdx = PlayerState.TerrainSlotIndex;
+            p.TerrainSlot.Occupant = null;
+        }
 
         var script = ctx.CardDatabase.Get(target.Card);
         target.Zone = Zone.Graveyard;
         p.Graveyard.Add(target);
         p.MinionDestroyedThisTurn = true;
 
-        if (script.CardType == CardType.Amulet)
+        if (script.CardType == CardType.Amulet || script.CardType == CardType.Terrain)
             ctx.Loop.Publish(new AmuletDestroyedEvent(target.Instance, target.Card, target.Owner, tileIdx ?? -1), ctx);
         else
             ctx.Loop.Publish(new MinionDestroyedEvent(target.Instance, target.Card, target.Owner, tileIdx), ctx);

@@ -44,6 +44,10 @@ public sealed record PlayCardAction(
                     throw new InvalidActionException("格子序号越界");
                 if (!p.Field[TileIndex.Value].IsEmpty) throw new InvalidActionException("该格子已被占据");
                 break;
+            case CardType.Terrain:
+                // Terrain ignores TileIndex; always lands in the dedicated TerrainSlot.
+                if (!p.TerrainSlot.IsEmpty) throw new InvalidActionException("场地槽位已被占据");
+                break;
             case CardType.Spell:
                 ValidateSpellTarget(state, script);
                 break;
@@ -69,9 +73,8 @@ public sealed record PlayCardAction(
         }
         else
         {
-            // Minion / amulet: rehydrate the hand card with script stats and place it on the chosen tile.
+            // Minion / amulet / terrain: rehydrate the hand card with script stats and place it.
             // Keeps the InstanceId stable across Hand → Field so UI selection and Net replay stay coherent.
-            int idx = TileIndex!.Value;
             card.Zone = Zone.Field;
             card.Owner = Issuer;
             card.CurrentAttack = script.BaseAttack;
@@ -81,12 +84,23 @@ public sealed record PlayCardAction(
             card.Countdown = script.InitialCountdown;
             card.CanAttackThisTurn = script.InitialKeywords.HasFlag(Keyword.Storm);
             card.SummonedThisTurn = true;
-            p.Field[idx].Occupant = card;
 
-            if (script.CardType == CardType.Amulet)
+            int idx;
+            if (script.CardType == CardType.Terrain)
+            {
+                idx = PlayerState.TerrainSlotIndex;
+                p.TerrainSlot.Occupant = card;
                 ctx.Loop.Publish(new AmuletPlacedEvent(Issuer, card.Instance, card.Card, idx), ctx);
+            }
             else
-                ctx.Loop.Publish(new MinionSummonedEvent(Issuer, card.Instance, card.Card, idx), ctx);
+            {
+                idx = TileIndex!.Value;
+                p.Field[idx].Occupant = card;
+                if (script.CardType == CardType.Amulet)
+                    ctx.Loop.Publish(new AmuletPlacedEvent(Issuer, card.Instance, card.Card, idx), ctx);
+                else
+                    ctx.Loop.Publish(new MinionSummonedEvent(Issuer, card.Instance, card.Card, idx), ctx);
+            }
 
             ctx.SourceSide = Issuer;
             ctx.Source = card;

@@ -5,6 +5,7 @@ public enum CardType
     Minion,
     Spell,
     Amulet,
+    Terrain,
 }
 
 public enum Rarity

@@ -105,6 +105,13 @@ public partial class BattleController : Node
             return;
         }
 
+        if (script.CardType == CardType.Terrain)
+        {
+            // Auto-target: terrain has exactly one slot. Skip the "pick a tile" step.
+            TrySubmit(new PlayCardAction(LocalSide, card.Instance, PlayerState.TerrainSlotIndex, null, null));
+            return;
+        }
+
         if (_selectedSpec == TargetSpec.None)
         {
             TrySubmit(new PlayCardAction(LocalSide, card.Instance, null, null, null));
@@ -128,9 +135,16 @@ public partial class BattleController : Node
                 case CardType.Minion:
                 case CardType.Amulet:
                     if (side != LocalSide) { _board.SetStatus("必须放在己方场地"); return; }
+                    if (tileIndex == PlayerState.TerrainSlotIndex)
+                    {
+                        _board.SetStatus($"{script.Name} 不能放在场地槽位");
+                        return;
+                    }
                     TrySubmit(new PlayCardAction(LocalSide, _selectedHandInstance, tileIndex, null, null));
                     return;
                 case CardType.Spell:
+                    // V1: spells don't target the terrain slot (terrain isn't a regular minion).
+                    if (tileIndex == PlayerState.TerrainSlotIndex) return;
                     if (_loop.State.GetPlayer(side).Field[tileIndex].Occupant is { } occ)
                         TrySubmit(new PlayCardAction(LocalSide, _selectedHandInstance, null, occ.Instance, null));
                     return;
