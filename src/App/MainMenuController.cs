@@ -36,7 +36,7 @@ public partial class MainMenuController : Control
 
         AddButton(vb, "Hot Seat", OnHotSeat);
         AddButton(vb, "Multiplayer (TODO)", () => { }, disabled: true);
-        AddButton(vb, "Deck Builder (TODO)", () => { }, disabled: true);
+        AddButton(vb, "Deck Builder", OnDeckBuilder);
         AddButton(vb, "Quit", () => GetTree().Quit());
     }
 
@@ -55,5 +55,10 @@ public partial class MainMenuController : Control
     private void OnHotSeat()
     {
         GetTree().ChangeSceneToFile("res://scenes/Battle.tscn");
+    }
+
+    private void OnDeckBuilder()
+    {
+        GetTree().ChangeSceneToFile("res://scenes/DeckBuilder.tscn");
     }
 }
