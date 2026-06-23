@@ -74,30 +74,35 @@ public partial class BoardView : Control
         root.AddThemeConstantOverride("separation", RowSeparation);
         AddChild(root);
 
-        // Enemy info — centered, capped at tile row width so its edges align with the field row.
-        EnemyInfo = new PlayerInfoPanel { CustomMinimumSize = new Vector2(TileRowWidth, 70) };
-        EnemyInfo.HeroClicked += idx => EmitSignal(SignalName.HeroClicked, idx);
-        root.AddChild(WrapCentered(EnemyInfo));
-
-        // Enemy section: left flank | spacer | (hand + field) middle | spacer | right flank.
+        // Enemy section — flanks on the screen edges, middle column (info + hand + field) is centered and
+        // capped at tile-row width. Info now sits INSIDE this middle column so there are no spacers next to it.
         EnemyTopLeftSlot = MakePileSlot();
         EnemyGrave = MakePileSlot();
         EnemyTopRightSlot = MakePileSlot();
         EnemyDeck = MakePileSlot();
         EnemyHand = new HandView { ShowFaces = false };
         EnemyHand.CardSelected += iid => EmitSignal(SignalName.HandCardClicked, (int)EnemyHand.Side, iid);
+        EnemyInfo = new PlayerInfoPanel { CustomMinimumSize = new Vector2(TileRowWidth, 70), SizeFlagsHorizontal = SizeFlags.Fill };
+        EnemyInfo.HeroClicked += idx => EmitSignal(SignalName.HeroClicked, idx);
         EnemyTiles = BuildPlayerSection(
             root, isTopSide: true,
-            EnemyHand,
+            EnemyInfo, EnemyHand,
             placeholderUpper: EnemyTopLeftSlot, leftFlankLower: EnemyGrave,
             placeholderUpper2: EnemyTopRightSlot, rightFlankLower: EnemyDeck);
 
-        // Central divider.
-        var sep = new HSeparator();
-        sep.AddThemeConstantOverride("separation", 12);
+        // Vertical Spacer + narrow HSep + Spacer: pushes EnemySection up and MySection down, HSep at viewport center.
+        root.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill });
+
+        var sep = new HSeparator
+        {
+            CustomMinimumSize = new Vector2(720, 4),
+            SizeFlagsHorizontal = SizeFlags.ShrinkCenter,
+        };
         root.AddChild(sep);
 
-        // My section: middle is (field + hand). Flanks have piles ABOVE placeholders (deck/grave near HSep).
+        root.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill });
+
+        // My section: middle is (field + hand + info). Flanks have piles ABOVE placeholders (deck/grave near HSep).
         MyTopLeftSlot = MakePileSlot();
         MyDeck = MakePileSlot();
         MyTopRightSlot = MakePileSlot();
@@ -106,17 +111,16 @@ public partial class BoardView : Control
         MyHand.CardSelected += iid => EmitSignal(SignalName.HandCardClicked, (int)MyHand.Side, iid);
         MyHand.CardHovered += OnHandCardHovered;
         MyHand.CardHoverExited += _ => DetailPanel.HoverHide();
+        MyInfo = new PlayerInfoPanel { CustomMinimumSize = new Vector2(TileRowWidth, 70), SizeFlagsHorizontal = SizeFlags.Fill };
+        MyInfo.HeroClicked += idx => EmitSignal(SignalName.HeroClicked, idx);
         MyTiles = BuildPlayerSection(
             root, isTopSide: false,
-            MyHand,
+            MyInfo, MyHand,
             placeholderUpper: MyTopLeftSlot, leftFlankLower: MyDeck,
             placeholderUpper2: MyTopRightSlot, rightFlankLower: MyGrave);
 
-        MyInfo = new PlayerInfoPanel { CustomMinimumSize = new Vector2(TileRowWidth, 70) };
-        MyInfo.HeroClicked += idx => EmitSignal(SignalName.HeroClicked, idx);
-        root.AddChild(WrapCentered(MyInfo));
-
-        // End Turn floats over the right edge, vertical center of the screen (the HSep area between the two sections).
+        // End Turn anchored to right edge, vertical center. Sits in the gap between flanks (above MyRightFlank,
+        // below EnemyRightFlank) since sections shrink to their natural height and don't reach the screen center.
         EndTurnButton = new Button
         {
             Text = "结束回合",
@@ -143,26 +147,14 @@ public partial class BoardView : Control
     }
 
     /// <summary>
-    /// Wraps a Control in an HBox with two ExpandFill spacers so the inner Control stays at its minimum width
-    /// and is horizontally centered. Used by the info bars to clamp them to TileRowWidth.
-    /// </summary>
-    private static Container WrapCentered(Control inner)
-    {
-        var row = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        row.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
-        row.AddChild(inner);
-        row.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
-        return row;
-    }
-
-    /// <summary>
-    /// Build one player's section: an HBox containing left flank | spacer | middle (hand+field stacked) | spacer | right flank.
-    /// Top side: hand is above field, flank cells stack placeholder ↑ then deck/grave ↓ (deck/grave near HSep).
-    /// Bottom side: field above hand, flank cells stack deck/grave ↑ then placeholder ↓ (deck/grave near HSep).
-    /// Either way the flanks are anchored to the screen edges via spacers, and span the entire section height.
+    /// Build one player's section HBox: left flank | spacer | middle (info + hand + field) | spacer | right flank.
+    /// Info bar sits at the outer edge of the middle column so it lines up with hand/field, no side spacers.
+    /// Top side: info → hand → field, flank cells stack placeholder ↑ then deck/grave ↓ (deck/grave near HSep).
+    /// Bottom side: field → hand → info, flank cells stack deck/grave ↑ then placeholder ↓ (deck/grave near HSep).
     /// </summary>
     private TileSlotView[] BuildPlayerSection(
-        Container parent, bool isTopSide, HandView handView,
+        Container parent, bool isTopSide,
+        PlayerInfoPanel infoPanel, HandView handView,
         PileView placeholderUpper, PileView leftFlankLower,
         PileView placeholderUpper2, PileView rightFlankLower)
     {
@@ -179,13 +171,18 @@ public partial class BoardView : Control
 
         section.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
 
-        // Middle column = hand + field (order depends on side).
-        var middle = new VBoxContainer();
+        // Middle column: info + hand + field (or field + hand + info for bottom side).
+        var middle = new VBoxContainer
+        {
+            CustomMinimumSize = new Vector2(TileRowWidth, 0),
+            SizeFlagsHorizontal = SizeFlags.ShrinkCenter,
+        };
         middle.AddThemeConstantOverride("separation", RowSeparation);
         var tiles = new TileSlotView[PlayerState.FieldSize];
         var fieldRow = BuildBareFieldRow(tiles);
         if (isTopSide)
         {
+            middle.AddChild(infoPanel);
             middle.AddChild(handView);
             middle.AddChild(fieldRow);
         }
@@ -193,6 +190,7 @@ public partial class BoardView : Control
         {
             middle.AddChild(fieldRow);
             middle.AddChild(handView);
+            middle.AddChild(infoPanel);
         }
         section.AddChild(middle);
 
