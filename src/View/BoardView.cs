@@ -18,6 +18,7 @@ public partial class BoardView : Control
     public const int RowSeparation = 4;
     public const int EdgeColumnWidth = 156;
     public const int EdgeInfoGap = 90;   // vertical space reserved for info bar + margin
+    public const int CenterGap = 32;     // gap between pile column edge and the central separator
 
     [Signal] public delegate void HandCardClickedEventHandler(int sideIndex, int instanceId);
     [Signal] public delegate void TileClickedEventHandler(int sideIndex, int tileIndex);
@@ -127,14 +128,15 @@ public partial class BoardView : Control
         DetailPanel = new CardDetailPanel();
         AddChild(DetailPanel);
 
-        // Pile columns anchored to the four screen corners, sized to span tile+hand area on each side.
+        // Pile columns anchored to the four screen corners. Mirror layout: enemy deck/grave swap left↔right
+        // so my-deck (BL) sits diagonally across from enemy-deck (TR), and my-grave (BR) from enemy-grave (TL).
         EnemyTopLeftSlot = MakePileSlot();
-        EnemyDeck = MakePileSlot();
-        AddEdgePileColumn(EnemyTopLeftSlot, EnemyDeck, leftSide: true, topHalf: true);
+        EnemyGrave = MakePileSlot();
+        AddEdgePileColumn(EnemyTopLeftSlot, EnemyGrave, leftSide: true, topHalf: true);
 
         EnemyTopRightSlot = MakePileSlot();
-        EnemyGrave = MakePileSlot();
-        AddEdgePileColumn(EnemyTopRightSlot, EnemyGrave, leftSide: false, topHalf: true);
+        EnemyDeck = MakePileSlot();
+        AddEdgePileColumn(EnemyTopRightSlot, EnemyDeck, leftSide: false, topHalf: true);
 
         MyTopLeftSlot = MakePileSlot();
         MyDeck = MakePileSlot();
@@ -197,12 +199,14 @@ public partial class BoardView : Control
 
         if (topHalf)
         {
+            // Keep the 20-ish gap below EnemyInfo; lift the bottom edge up so a CenterGap forms above the divider.
             col.OffsetTop = Margin + EdgeInfoGap;
-            col.OffsetBottom = -RowSeparation;
+            col.OffsetBottom = -CenterGap;
         }
         else
         {
-            col.OffsetTop = RowSeparation;
+            // Keep the bottom edge's relative position to MyInfo; push the top edge down to mirror the gap above.
+            col.OffsetTop = CenterGap;
             col.OffsetBottom = -(Margin + EdgeInfoGap);
         }
 

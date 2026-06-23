@@ -399,17 +399,32 @@ public partial class BattleController : Node
         _board.UnpinDetail();
     }
 
-    public override void _UnhandledInput(InputEvent @event)
+    /// <summary>
+    /// Listen at the top-level _Input pipeline (fires before any Control consumes mouse events). Without this,
+    /// right-clicks on a CardView (whose MouseFilter is Stop by default) would never reach _UnhandledInput.
+    /// </summary>
+    public override void _Input(InputEvent @event)
     {
         if (_isAnimating || _loop is null) return;
+        if (_mode == Mode.Idle) return;
+        if (IsPopupOpen()) return; // let the popup own right-click while it is up.
+
         bool cancel =
-            (@event is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Right })
-            || (@event is InputEventKey { Pressed: true, Keycode: Key.Escape });
-        if (cancel && _mode != Mode.Idle)
+            (@event is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Right)
+            || (@event is InputEventKey kev && kev.Pressed && kev.Keycode == Key.Escape);
+
+        if (cancel)
         {
             ResetMode();
             GetViewport().SetInputAsHandled();
         }
+    }
+
+    private bool IsPopupOpen()
+    {
+        foreach (var c in GetChildren())
+            if (c is PilePopup) return true;
+        return false;
     }
 
     private void HighlightFriendlyEmptyTiles()
