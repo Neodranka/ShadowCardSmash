@@ -95,7 +95,8 @@ public partial class BattleController : Node
         if (script.CardType == CardType.Minion || script.CardType == CardType.Amulet)
         {
             _mode = Mode.AwaitPlayTarget;
-            _board.SetStatus($"选择一个空格子放置 {script.Name}");
+            _board.SetStatus($"选择一个空格子放置 {script.Name}（右键/Esc 取消）");
+            _board.PinDetail(card.Instance);
             HighlightFriendlyEmptyTiles();
             return;
         }
@@ -106,7 +107,8 @@ public partial class BattleController : Node
             return;
         }
         _mode = Mode.AwaitPlayTarget;
-        _board.SetStatus($"为 {script.Name} 选择一个目标");
+        _board.SetStatus($"为 {script.Name} 选择一个目标（右键/Esc 取消）");
+        _board.PinDetail(card.Instance);
     }
 
     private void OnTileClicked(int sideIndex, int tileIndex)
@@ -166,9 +168,10 @@ public partial class BattleController : Node
 
             _selectedAttacker = instance;
             _mode = Mode.AwaitAttackTarget;
-            _board.SetStatus(CombatResolver.EnemyHasWard(_loop.State, LocalSide)
+            _board.SetStatus((CombatResolver.EnemyHasWard(_loop.State, LocalSide)
                 ? "对方有守护，必须先攻击守护随从"
-                : "选择攻击目标（敌方随从或英雄）");
+                : "选择攻击目标（敌方随从或英雄）") + "  右键/Esc 取消");
+            _board.PinDetail(instance);
         }
     }
 
@@ -324,6 +327,20 @@ public partial class BattleController : Node
         _selectedAttacker = InstanceId.None;
         _board.SetStatus("");
         _board.ClearHighlights();
+        _board.UnpinDetail();
+    }
+
+    public override void _UnhandledInput(InputEvent @event)
+    {
+        if (_isAnimating || _loop is null) return;
+        bool cancel =
+            (@event is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Right })
+            || (@event is InputEventKey { Pressed: true, Keycode: Key.Escape });
+        if (cancel && _mode != Mode.Idle)
+        {
+            ResetMode();
+            GetViewport().SetInputAsHandled();
+        }
     }
 
     private void HighlightFriendlyEmptyTiles()

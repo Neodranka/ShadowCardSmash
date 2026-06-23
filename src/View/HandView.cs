@@ -10,6 +10,8 @@ namespace ShadowCardSmash.View;
 public partial class HandView : HBoxContainer
 {
     [Signal] public delegate void CardSelectedEventHandler(int instanceId);
+    [Signal] public delegate void CardHoveredEventHandler(int instanceId);
+    [Signal] public delegate void CardHoverExitedEventHandler(int instanceId);
 
     public PlayerSide Side { get; set; }
     public bool ShowFaces { get; set; } = true;
@@ -38,6 +40,8 @@ public partial class HandView : HBoxContainer
             {
                 cv.Bind(card, db.Get(card.Card), onField: false);
                 cv.Clicked += OnCardClicked;
+                cv.HoverEntered += iid => EmitSignal(SignalName.CardHovered, iid);
+                cv.HoverExited += iid => EmitSignal(SignalName.CardHoverExited, iid);
             }
             else
             {

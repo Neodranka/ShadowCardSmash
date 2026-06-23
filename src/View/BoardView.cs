@@ -31,9 +31,13 @@ public partial class BoardView : Control
     public PlayerInfoPanel MyInfo = null!;
     public Button EndTurnButton = null!;
     public Label StatusLabel = null!;
+    public CardDetailPanel DetailPanel = null!;
 
     /// <summary>Maps InstanceId → on-field CardView so animation code can locate a card by id.</summary>
     private readonly Dictionary<InstanceId, CardView> _fieldCardLookup = new();
+
+    private GameState? _lastState;
+    private ICardDatabase? _lastDb;
 
     private bool _builtUi;
 
@@ -63,6 +67,7 @@ public partial class BoardView : Control
 
         EnemyHand = new HandView { ShowFaces = false };
         EnemyHand.CardSelected += iid => EmitSignal(SignalName.HandCardClicked, (int)EnemyHand.Side, iid);
+        // No hover detail for enemy hand: face-down cards have nothing to inspect.
         root.AddChild(EnemyHand);
 
         EnemyTiles = BuildFieldRow(root);
@@ -75,6 +80,8 @@ public partial class BoardView : Control
 
         MyHand = new HandView { ShowFaces = true };
         MyHand.CardSelected += iid => EmitSignal(SignalName.HandCardClicked, (int)MyHand.Side, iid);
+        MyHand.CardHovered += OnHandCardHovered;
+        MyHand.CardHoverExited += _ => DetailPanel.HoverHide();
         root.AddChild(MyHand);
 
         MyInfo = new PlayerInfoPanel { SizeFlagsHorizontal = SizeFlags.ExpandFill };
@@ -101,6 +108,10 @@ public partial class BoardView : Control
         StatusLabel.AddThemeFontSizeOverride("font_size", 28);
         StatusLabel.Modulate = new Color(1f, 0.95f, 0.5f);
         AddChild(StatusLabel);
+
+        // Card detail side panel (hidden until hover or pin).
+        DetailPanel = new CardDetailPanel();
+        AddChild(DetailPanel);
     }
 
     private TileSlotView[] BuildFieldRow(Container parent)
@@ -124,6 +135,8 @@ public partial class BoardView : Control
     public void Rebind(GameState state, ICardDatabase db, PlayerSide localSide)
     {
         BuildUi();
+        _lastState = state;
+        _lastDb = db;
 
         var me = state.GetPlayer(localSide);
         var enemy = state.GetPlayer(localSide.Opponent());
@@ -162,7 +175,7 @@ public partial class BoardView : Control
         };
     }
 
-    private static void RebindRow(TileSlotView[] tiles, PlayerState p, ICardDatabase db,
+    private void RebindRow(TileSlotView[] tiles, PlayerState p, ICardDatabase db,
         System.Action<TileSlotView, int> onMinionClicked,
         Dictionary<InstanceId, CardView> lookup)
     {
@@ -176,9 +189,57 @@ public partial class BoardView : Control
             cv.Bind(occ, db.Get(occ.Card), onField: true);
             var capturedTile = tiles[i];
             cv.Clicked += iid => onMinionClicked(capturedTile, iid);
+            cv.HoverEntered += iid => OnFieldCardHovered(iid);
+            cv.HoverExited += _ => DetailPanel.HoverHide();
             lookup[occ.Instance] = cv;
         }
     }
+
+    private void OnHandCardHovered(int instanceId)
+    {
+        if (_lastState is null || _lastDb is null) return;
+        var iid = new InstanceId(instanceId);
+        foreach (var p in _lastState.Players)
+        {
+            var card = p.Hand.FirstOrDefault(c => c.Instance == iid);
+            if (card is not null)
+            {
+                DetailPanel.ShowFor(card, _lastDb.Get(card.Card), onField: false, pin: false);
+                return;
+            }
+        }
+    }
+
+    private void OnFieldCardHovered(int instanceId)
+    {
+        if (_lastState is null || _lastDb is null) return;
+        var iid = new InstanceId(instanceId);
+        foreach (var p in _lastState.Players)
+        {
+            foreach (var t in p.Field)
+            {
+                if (t.Occupant is { } occ && occ.Instance == iid)
+                {
+                    DetailPanel.ShowFor(occ, _lastDb.Get(occ.Card), onField: true, pin: false);
+                    return;
+                }
+            }
+        }
+    }
+
+    public void PinDetail(InstanceId id)
+    {
+        if (_lastState is null || _lastDb is null) return;
+        foreach (var p in _lastState.Players)
+        {
+            var hc = p.Hand.FirstOrDefault(c => c.Instance == id);
+            if (hc is not null) { DetailPanel.ShowFor(hc, _lastDb.Get(hc.Card), onField: false, pin: true); return; }
+            var fc = p.FindOnField(id);
+            if (fc is not null) { DetailPanel.ShowFor(fc, _lastDb.Get(fc.Card), onField: true, pin: true); return; }
+        }
+    }
+
+    public void UnpinDetail() => DetailPanel.Unpin();
 
     public CardView? GetFieldCardView(InstanceId id)
         => _fieldCardLookup.TryGetValue(id, out var cv) ? cv : null;
