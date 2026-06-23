@@ -8,15 +8,18 @@ namespace ShadowCardSmash.Engine;
 /// </summary>
 public static class EvolutionSystem
 {
-    public const int InitialEvolutionPoints = 3;
+    /// <summary>EP granted at unlock time to BOTH players.</summary>
+    public const int EvolutionPointsAtUnlock = 3;
     public const int EvolutionAttackBoost = 2;
     public const int EvolutionHealthBoost = 2;
-    public const int EvolutionUnlockTurnForSecond = 4;
+    /// <summary>
+    /// Absolute TurnNumber at which both players' EP unlock — corresponds to the second player's 4th turn
+    /// (TurnNumber 1=P1 turn 1, 2=P2 turn 1, ..., 8=P2 turn 4).
+    /// </summary>
+    public const int EvolutionUnlockTurnAbsolute = 8;
 
     public static bool CanManuallyEvolve(GameState state, PlayerSide side)
     {
-        if (side != PlayerSide.Second) return false; // only second player has EP in GDD §7.1
-        if (state.TurnNumber < EvolutionUnlockTurnForSecond) return false;
         var p = state.GetPlayer(side);
         if (p.EvolutionPoints <= 0) return false;
         if (p.HasEvolvedThisTurn) return false;
@@ -34,6 +37,8 @@ public static class EvolutionSystem
         target.MaxHealth = Math.Max(script.EvolvedHealth, target.MaxHealth + EvolutionHealthBoost);
         target.CurrentHealth = Math.Min(target.MaxHealth, target.CurrentHealth + EvolutionHealthBoost);
         target.AddKeyword(Keyword.Rush);
+        // Evolving fully lifts summoning sickness — minion may attack anything immediately (including hero).
+        target.SummonedThisTurn = false;
         target.CanAttackThisTurn = true;
 
         if (consumesEP)

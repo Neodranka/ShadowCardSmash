@@ -29,13 +29,17 @@ public partial class BoardView : Control
     public HandView EnemyHand = null!;
     public TileSlotView[] EnemyTiles = null!;
     public TileSlotView EnemyTerrain = null!;
+    public EvolutionButton EnemyEvolveButton = null!;
     public TileSlotView[] MyTiles = null!;
     public TileSlotView MyTerrain = null!;
+    public EvolutionButton MyEvolveButton = null!;
     public HandView MyHand = null!;
     public PlayerInfoPanel MyInfo = null!;
     public Button EndTurnButton = null!;
     public Label StatusLabel = null!;
     public CardDetailPanel DetailPanel = null!;
+
+    [Signal] public delegate void EvolveButtonClickedEventHandler(int sideIndex);
 
     public PileView EnemyDeck = null!;
     public PileView EnemyGrave = null!;
@@ -91,7 +95,7 @@ public partial class BoardView : Control
             EnemyInfo, EnemyHand,
             placeholderUpper: EnemyTopLeftSlot, leftFlankLower: EnemyGrave,
             placeholderUpper2: EnemyTopRightSlot, rightFlankLower: EnemyDeck,
-            out EnemyTerrain);
+            out EnemyTerrain, out EnemyEvolveButton);
 
         // Vertical Spacer + narrow HSep + Spacer: pushes EnemySection up and MySection down, HSep at viewport center.
         root.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill });
@@ -121,7 +125,7 @@ public partial class BoardView : Control
             MyInfo, MyHand,
             placeholderUpper: MyTopLeftSlot, leftFlankLower: MyDeck,
             placeholderUpper2: MyTopRightSlot, rightFlankLower: MyGrave,
-            out MyTerrain);
+            out MyTerrain, out MyEvolveButton);
 
         // End Turn anchored to right edge, vertical center. Sits in the gap between flanks (above MyRightFlank,
         // below EnemyRightFlank) since sections shrink to their natural height and don't reach the screen center.
@@ -161,7 +165,7 @@ public partial class BoardView : Control
         PlayerInfoPanel infoPanel, HandView handView,
         PileView placeholderUpper, PileView leftFlankLower,
         PileView placeholderUpper2, PileView rightFlankLower,
-        out TileSlotView terrainSlot)
+        out TileSlotView terrainSlot, out EvolutionButton evolveButton)
     {
         var section = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         section.AddThemeConstantOverride("separation", 8);
@@ -184,7 +188,9 @@ public partial class BoardView : Control
         };
         middle.AddThemeConstantOverride("separation", RowSeparation);
         var tiles = new TileSlotView[PlayerState.FieldSize];
-        var fieldRow = BuildBareFieldRow(tiles, out terrainSlot);
+        var fieldRow = BuildBareFieldRow(tiles, out terrainSlot, out evolveButton);
+        var capturedButton = evolveButton;
+        evolveButton.EvolveButtonClicked += sideIdx => EmitSignal(SignalName.EvolveButtonClicked, sideIdx);
         if (isTopSide)
         {
             middle.AddChild(infoPanel);
@@ -211,10 +217,16 @@ public partial class BoardView : Control
         return tiles;
     }
 
-    private HBoxContainer BuildBareFieldRow(TileSlotView[] tilesOut, out TileSlotView terrainOut)
+    private HBoxContainer BuildBareFieldRow(TileSlotView[] tilesOut, out TileSlotView terrainOut, out EvolutionButton evolveOut)
     {
         var row = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ShrinkCenter };
         row.AddThemeConstantOverride("separation", 8);
+
+        // Left edge: evolution button (mirror of terrain on the right).
+        evolveOut = new EvolutionButton();
+        row.AddChild(evolveOut);
+        row.AddChild(new Control { CustomMinimumSize = new Vector2(24, 0) });
+
         for (int i = 0; i < PlayerState.FieldSize; i++)
         {
             var tile = new TileSlotView { TileIndex = i };
@@ -223,7 +235,7 @@ public partial class BoardView : Control
             tilesOut[i] = tile;
         }
 
-        // Small visual gap, then the dedicated terrain slot with a distinct (amber) border.
+        // Right edge: dedicated terrain slot with a distinct (amber) border.
         row.AddChild(new Control { CustomMinimumSize = new Vector2(24, 0) });
         terrainOut = new TileSlotView { TileIndex = PlayerState.TerrainSlotIndex, IsTerrain = true };
         var capturedTerrain = terrainOut;
@@ -259,6 +271,12 @@ public partial class BoardView : Control
         foreach (var t in EnemyTiles) t.Side = localSide.Opponent();
         MyTerrain.Side = localSide;
         EnemyTerrain.Side = localSide.Opponent();
+        MyEvolveButton.Side = localSide;
+        EnemyEvolveButton.Side = localSide.Opponent();
+
+        bool epUnlocked = state.TurnNumber >= Engine.EvolutionSystem.EvolutionUnlockTurnAbsolute;
+        MyEvolveButton.Bind(me.EvolutionPoints, epUnlocked, me.HasEvolvedThisTurn);
+        EnemyEvolveButton.Bind(enemy.EvolutionPoints, epUnlocked, enemy.HasEvolvedThisTurn);
 
         MyDeck.Side = localSide; MyGrave.Side = localSide;
         MyTopLeftSlot.Side = localSide; MyTopRightSlot.Side = localSide;

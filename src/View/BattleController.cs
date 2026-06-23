@@ -22,7 +22,7 @@ public partial class BattleController : Node
     private CardRegistry _registry = null!;
     private BoardView _board = null!;
 
-    private enum Mode { Idle, AwaitPlayTarget, AwaitAttackTarget }
+    private enum Mode { Idle, AwaitPlayTarget, AwaitAttackTarget, AwaitEvolveTarget }
     private Mode _mode = Mode.Idle;
     private InstanceId _selectedHandInstance;
     private CardId _selectedCardId;
@@ -49,6 +49,7 @@ public partial class BattleController : Node
         _board.HeroClicked += OnHeroClicked;
         _board.EndTurnClicked += OnEndTurnClicked;
         _board.PileClicked += OnPileClicked;
+        _board.EvolveButtonClicked += OnEvolveButtonClicked;
 
         StartHotSeatGame();
     }
@@ -176,6 +177,16 @@ public partial class BattleController : Node
             return;
         }
 
+        // Evolve target — must be a friendly minion.
+        if (_mode == Mode.AwaitEvolveTarget)
+        {
+            if (side != LocalSide) { _board.SetStatus("只能进化己方随从"); return; }
+            var target = _loop.State.GetPlayer(side).FindOnField(instance);
+            if (target is null || target.IsEvolved) { _board.SetStatus("无法进化此随从"); return; }
+            TrySubmit(new EvolveAction(LocalSide, instance));
+            return;
+        }
+
         if (side == LocalSide)
         {
             var attacker = _loop.State.GetPlayer(side).FindOnField(instance);
@@ -218,6 +229,25 @@ public partial class BattleController : Node
         if (_loop.State.Phase != GamePhase.Main) return;
         ResetMode();
         TrySubmit(new EndTurnAction(LocalSide));
+    }
+
+    private void OnEvolveButtonClicked(int sideIndex)
+    {
+        if (_isAnimating || _loop.IsGameOver) return;
+        var side = (PlayerSide)sideIndex;
+        if (side != LocalSide) return;
+        if (!EvolutionSystem.CanManuallyEvolve(_loop.State, LocalSide))
+        {
+            _board.SetStatus("EP 不足或本回合已进化过");
+            return;
+        }
+        // Toggle off when already in evolve mode.
+        if (_mode == Mode.AwaitEvolveTarget) { ResetMode(); return; }
+
+        ResetMode();
+        _mode = Mode.AwaitEvolveTarget;
+        _board.MyEvolveButton.SetActive(true);
+        _board.SetStatus("选择一个我方随从进化（右键/Esc 取消）");
     }
 
     private void OnPileClicked(int sideIndex, int kindIndex)
@@ -414,6 +444,7 @@ public partial class BattleController : Node
         _board.SetStatus("");
         _board.ClearHighlights();
         _board.UnpinDetail();
+        if (_board.MyEvolveButton is not null) _board.MyEvolveButton.SetActive(false);
     }
 
     /// <summary>

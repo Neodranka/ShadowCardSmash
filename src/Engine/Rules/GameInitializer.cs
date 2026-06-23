@@ -31,8 +31,7 @@ public static class GameInitializer
         DealInitial(state, PlayerSide.First, FirstPlayerStartingHand);
         DealInitial(state, PlayerSide.Second, SecondPlayerStartingHand);
 
-        // Second player gets EP, may have compensation card kept aside.
-        state.GetPlayer(PlayerSide.Second).EvolutionPoints = EvolutionSystem.InitialEvolutionPoints;
+        // EP starts locked (0) for both players — both gain 3 at the start of P2's 4th turn (see TurnManager).
 
         state.Phase = GamePhase.Mulligan;
         state.CurrentPlayer = PlayerSide.First;

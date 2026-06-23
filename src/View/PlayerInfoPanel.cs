@@ -16,7 +16,6 @@ public partial class PlayerInfoPanel : PanelContainer
     private Label _hp = null!;
     private Label _mana = null!;
     private Label _deck = null!;
-    private Label _ep = null!;
     private Label _turn = null!;
     private bool _builtUi;
 
@@ -47,9 +46,8 @@ public partial class PlayerInfoPanel : PanelContainer
         _hp = MakeLabel("HP 40", new Color(1f, 0.55f, 0.55f));
         _mana = MakeLabel("0/0", new Color(0.5f, 0.8f, 1f));
         _deck = MakeLabel("Deck 40", new Color(0.85f, 0.85f, 0.85f));
-        _ep = MakeLabel("EP 0", new Color(1f, 0.8f, 1f));
         _turn = MakeLabel("", new Color(1f, 1f, 0.6f));
-        hb.AddChild(_hp); hb.AddChild(_mana); hb.AddChild(_deck); hb.AddChild(_ep); hb.AddChild(_turn);
+        hb.AddChild(_hp); hb.AddChild(_mana); hb.AddChild(_deck); hb.AddChild(_turn);
     }
 
     private static Label MakeLabel(string text, Color color)
@@ -65,7 +63,6 @@ public partial class PlayerInfoPanel : PanelContainer
         _hp.Text = $"HP {p.Health}/{p.MaxHealth}";
         _mana.Text = $"{p.Mana}/{p.MaxMana}";
         _deck.Text = $"Deck {p.Deck.Count} / Grave {p.Graveyard.Count}";
-        _ep.Text = $"EP {p.EvolutionPoints}";
         _turn.Text = isMyTurn ? "▶ YOUR TURN" : "";
     }
 

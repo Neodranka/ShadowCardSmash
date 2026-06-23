@@ -25,6 +25,16 @@ public static class TurnManager
         p.Mana = p.MaxMana;
         ctx.Loop.Publish(new ManaChangedEvent(side, p.Mana, p.MaxMana), ctx);
 
+        // Evolution unlock: at start of P2's 4th turn (TurnNumber 8), BOTH players gain 3 EP. One-shot.
+        if (state.TurnNumber == EvolutionSystem.EvolutionUnlockTurnAbsolute)
+        {
+            foreach (var pl in state.Players)
+            {
+                pl.EvolutionPoints += EvolutionSystem.EvolutionPointsAtUnlock;
+                ctx.Loop.Publish(new EvolutionPointsGrantedEvent(pl.Side, EvolutionSystem.EvolutionPointsAtUnlock), ctx);
+            }
+        }
+
         // Refresh attack permissions for surviving minions.
         // SummonedThisTurn is cleared FIRST so that a minion played on the previous owner-turn is fully
         // available now (Hearthstone-style: summoning sickness lasts until your next turn begins).

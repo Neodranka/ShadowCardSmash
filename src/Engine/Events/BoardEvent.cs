@@ -43,6 +43,7 @@ public sealed record AmuletDestroyedEvent(InstanceId Instance, CardId Card, Play
 public sealed record MinionVanishedEvent(InstanceId Instance, CardId Card, PlayerSide Owner) : BoardEvent;
 
 public sealed record MinionEvolvedEvent(InstanceId Instance) : BoardEvent;
+public sealed record EvolutionPointsGrantedEvent(PlayerSide Side, int Amount) : BoardEvent;
 public sealed record SilenceAppliedEvent(InstanceId Instance) : BoardEvent;
 public sealed record BuffAppliedEvent(InstanceId Instance, int AttackDelta, int HealthDelta) : BoardEvent;
 public sealed record KeywordGainedEvent(InstanceId Instance, Keyword Keyword) : BoardEvent;
