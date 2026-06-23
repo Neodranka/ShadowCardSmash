@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Godot;
 using ShadowCardSmash.Cards;
+using ShadowCardSmash.Cards.Resources;
 using ShadowCardSmash.Domain;
 using ShadowCardSmash.Engine;
 
@@ -36,6 +37,8 @@ public partial class BattleController : Node
     public override void _Ready()
     {
         _registry = CardRegistry.ScanAssembly(Assembly.GetExecutingAssembly());
+        var loaderResult = CardResourceLoader.AttachAll(_registry);
+        GD.Print($"[Cards] Registered {_registry.Count} scripts, attached {loaderResult.Attached} .tres resources, {loaderResult.Missing} missing.");
 
         _board = new BoardView();
         AddChild(_board);

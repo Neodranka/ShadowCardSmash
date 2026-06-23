@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CardDataResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Cards/Resources/CardDataResource.cs" id="1_card"]
+
+[resource]
+script = ExtResource("1_card")
+Name = "白板小兵"
+Description = "纯白板单位，无任何效果。用于演示 .tres 资源工作流。"
+Cost = 2
+BaseAttack = 2
+BaseHealth = 2
+EvolvedAttack = 4
+EvolvedHealth = 4
+CardTypeEnum = 0
+HeroClassEnum = 0
+RarityEnum = 0
+TagsArray = PackedStringArray()
+InitialKeywordsFlags = 0
+InitialCountdownValue = -1
+ArtPath = ""

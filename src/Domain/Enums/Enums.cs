@@ -21,6 +21,10 @@ public enum HeroClass
     Vampire = 1,
     ClassB = 2,
     ClassC = 3,
+    ClassD = 4,
+    ClassE = 5,
+    ClassF = 6,
+    ClassG = 7,
 }
 
 public enum GamePhase

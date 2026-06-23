@@ -17,6 +17,6 @@
   <ItemGroup>
     <Compile Include="..\..\src\Domain\**\*.cs" LinkBase="Domain" />
     <Compile Include="..\..\src\Engine\**\*.cs" LinkBase="Engine" />
-    <Compile Include="..\..\src\Cards\**\*.cs" LinkBase="Cards" />
+    <Compile Include="..\..\src\Cards\**\*.cs" Exclude="..\..\src\Cards\Resources\**\*.cs" LinkBase="Cards" />
   </ItemGroup>
 </Project>
