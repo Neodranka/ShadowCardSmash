@@ -29,7 +29,7 @@ public partial class EvolutionButton : PanelContainer
     }
 
     private Control _stack = null!;
-    private HBoxContainer _bar = null!;
+    private VBoxContainer _bar = null!;
     private Label _label = null!;
     private StyleBoxFlat _sb = null!;
     private bool _builtUi;
@@ -59,7 +59,7 @@ public partial class EvolutionButton : PanelContainer
         _stack = new Control { MouseFilter = MouseFilterEnum.Ignore };
         AddChild(_stack);
 
-        _bar = new HBoxContainer
+        _bar = new VBoxContainer
         {
             AnchorRight = 1, AnchorBottom = 1,
             MouseFilter = MouseFilterEnum.Ignore,
