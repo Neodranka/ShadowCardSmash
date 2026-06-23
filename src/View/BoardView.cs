@@ -33,6 +33,17 @@ public partial class BoardView : Control
     public Label StatusLabel = null!;
     public CardDetailPanel DetailPanel = null!;
 
+    public PileView EnemyDeck = null!;
+    public PileView EnemyGrave = null!;
+    public PileView EnemyTopLeftSlot = null!;
+    public PileView EnemyTopRightSlot = null!;
+    public PileView MyDeck = null!;
+    public PileView MyGrave = null!;
+    public PileView MyTopLeftSlot = null!;
+    public PileView MyTopRightSlot = null!;
+
+    [Signal] public delegate void PileClickedEventHandler(int sideIndex, int kindIndex);
+
     /// <summary>Maps InstanceId → on-field CardView so animation code can locate a card by id.</summary>
     private readonly Dictionary<InstanceId, CardView> _fieldCardLookup = new();
 
@@ -70,13 +81,19 @@ public partial class BoardView : Control
         // No hover detail for enemy hand: face-down cards have nothing to inspect.
         root.AddChild(EnemyHand);
 
-        EnemyTiles = BuildFieldRow(root);
+        EnemyTiles = BuildFieldRowWithPiles(
+            root, isEnemy: true,
+            out EnemyTopLeftSlot, out EnemyDeck,
+            out EnemyTopRightSlot, out EnemyGrave);
 
         var sep = new HSeparator();
         sep.AddThemeConstantOverride("separation", 12);
         root.AddChild(sep);
 
-        MyTiles = BuildFieldRow(root);
+        MyTiles = BuildFieldRowWithPiles(
+            root, isEnemy: false,
+            out MyTopLeftSlot, out MyDeck,
+            out MyTopRightSlot, out MyGrave);
 
         MyHand = new HandView { ShowFaces = true };
         MyHand.CardSelected += iid => EmitSignal(SignalName.HandCardClicked, (int)MyHand.Side, iid);
@@ -114,22 +131,51 @@ public partial class BoardView : Control
         AddChild(DetailPanel);
     }
 
-    private TileSlotView[] BuildFieldRow(Container parent)
+    private TileSlotView[] BuildFieldRowWithPiles(
+        Container parent, bool isEnemy,
+        out PileView topLeft, out PileView bottomLeft,
+        out PileView topRight, out PileView bottomRight)
     {
         var row = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ShrinkCenter };
-        row.AddThemeConstantOverride("separation", 12);
+        row.AddThemeConstantOverride("separation", 8);
         parent.AddChild(row);
 
+        // Left flanking column: top (placeholder), bottom (deck).
+        var leftCol = new VBoxContainer();
+        leftCol.AddThemeConstantOverride("separation", 4);
+        row.AddChild(leftCol);
+        topLeft = MakePileSlot();
+        bottomLeft = MakePileSlot();
+        leftCol.AddChild(topLeft);
+        leftCol.AddChild(bottomLeft);
+
+        // 6 field tiles.
         var tiles = new TileSlotView[PlayerState.FieldSize];
         for (int i = 0; i < PlayerState.FieldSize; i++)
         {
             var tile = new TileSlotView { TileIndex = i };
-            // Read the Side at click time so hot-seat side flips are honoured without rewiring listeners.
             tile.TileClicked += idx => EmitSignal(SignalName.TileClicked, (int)tile.Side, idx);
             row.AddChild(tile);
             tiles[i] = tile;
         }
+
+        // Right flanking column: top (placeholder), bottom (graveyard).
+        var rightCol = new VBoxContainer();
+        rightCol.AddThemeConstantOverride("separation", 4);
+        row.AddChild(rightCol);
+        topRight = MakePileSlot();
+        bottomRight = MakePileSlot();
+        rightCol.AddChild(topRight);
+        rightCol.AddChild(bottomRight);
+
         return tiles;
+    }
+
+    private PileView MakePileSlot()
+    {
+        var p = new PileView();
+        p.Clicked += (sideIdx, kindIdx) => EmitSignal(SignalName.PileClicked, sideIdx, kindIdx);
+        return p;
     }
 
     public void Rebind(GameState state, ICardDatabase db, PlayerSide localSide)
@@ -149,6 +195,20 @@ public partial class BoardView : Control
         EnemyHand.Side = localSide.Opponent();
         foreach (var t in MyTiles) t.Side = localSide;
         foreach (var t in EnemyTiles) t.Side = localSide.Opponent();
+
+        MyDeck.Side = localSide; MyGrave.Side = localSide;
+        MyTopLeftSlot.Side = localSide; MyTopRightSlot.Side = localSide;
+        EnemyDeck.Side = localSide.Opponent(); EnemyGrave.Side = localSide.Opponent();
+        EnemyTopLeftSlot.Side = localSide.Opponent(); EnemyTopRightSlot.Side = localSide.Opponent();
+
+        MyDeck.BindDeck(me.Deck.Count);
+        MyGrave.BindGraveyard(me.Graveyard.Count);
+        MyTopLeftSlot.BindPlaceholder();
+        MyTopRightSlot.BindPlaceholder();
+        EnemyDeck.BindDeck(enemy.Deck.Count);
+        EnemyGrave.BindGraveyard(enemy.Graveyard.Count);
+        EnemyTopLeftSlot.BindPlaceholder();
+        EnemyTopRightSlot.BindPlaceholder();
 
         MyInfo.Rebind(me, myTurn);
         EnemyInfo.Rebind(enemy, !myTurn);

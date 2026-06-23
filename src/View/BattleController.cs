@@ -45,6 +45,7 @@ public partial class BattleController : Node
         _board.MinionClicked += OnMinionClicked;
         _board.HeroClicked += OnHeroClicked;
         _board.EndTurnClicked += OnEndTurnClicked;
+        _board.PileClicked += OnPileClicked;
 
         StartHotSeatGame();
     }
@@ -200,6 +201,36 @@ public partial class BattleController : Node
         if (_loop.State.Phase != GamePhase.Main) return;
         ResetMode();
         TrySubmit(new EndTurnAction(LocalSide));
+    }
+
+    private void OnPileClicked(int sideIndex, int kindIndex)
+    {
+        if (_isAnimating) return;
+        var side = (PlayerSide)sideIndex;
+        var kind = (PileView.Kind)kindIndex;
+        var p = _loop.State.GetPlayer(side);
+
+        IReadOnlyList<RuntimeCard> cards;
+        string title;
+        if (kind == PileView.Kind.Deck)
+        {
+            // Cost ascending, then card id, so the view is stable across re-openings.
+            cards = p.Deck
+                .OrderBy(c => _registry.Get(c.Card).Cost)
+                .ThenBy(c => c.Card.Value)
+                .ToArray();
+            title = side == LocalSide ? $"我方牌库（{p.Deck.Count}）" : $"对方牌库（{p.Deck.Count}）";
+        }
+        else
+        {
+            // Graveyard preserves insertion order — newest at the end.
+            cards = p.Graveyard.ToArray();
+            title = side == LocalSide ? $"我方墓地（{p.Graveyard.Count}）" : $"对方墓地（{p.Graveyard.Count}）";
+        }
+
+        var popup = new PilePopup();
+        AddChild(popup);
+        popup.Populate(title, cards, _registry);
     }
 
     /// <summary>
