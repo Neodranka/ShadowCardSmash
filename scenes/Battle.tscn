@@ -1,11 +1,11 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://bxipvwcd6m86v"]
 
-[ext_resource type="Script" path="res://src/View/BattleController.cs" id="1_battle"]
+[ext_resource type="Script" uid="uid://cb4mdajwj1h5" path="res://src/View/BattleController.cs" id="1_battle"]
 
-[node name="Battle" type="Node"]
+[node name="Battle" type="Node" unique_id=614200485]
 script = ExtResource("1_battle")
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="Background" type="ColorRect" parent="." unique_id=2067660371]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0

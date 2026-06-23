@@ -32,6 +32,9 @@ public partial class BoardView : Control
     public Button EndTurnButton = null!;
     public Label StatusLabel = null!;
 
+    /// <summary>Maps InstanceId → on-field CardView so animation code can locate a card by id.</summary>
+    private readonly Dictionary<InstanceId, CardView> _fieldCardLookup = new();
+
     private bool _builtUi;
 
     public override void _Ready()
@@ -140,8 +143,9 @@ public partial class BoardView : Control
         MyHand.Rebind(me.Hand, db);
         EnemyHand.Rebind(enemy.Hand, db);
 
-        RebindRow(MyTiles, me, db, OnMinionClicked);
-        RebindRow(EnemyTiles, enemy, db, OnMinionClicked);
+        _fieldCardLookup.Clear();
+        RebindRow(MyTiles, me, db, OnMinionClicked, _fieldCardLookup);
+        RebindRow(EnemyTiles, enemy, db, OnMinionClicked, _fieldCardLookup);
 
         EndTurnButton.Disabled = !myTurn || state.Phase != GamePhase.Main;
         StatusLabel.Text = state.Phase switch
@@ -159,7 +163,8 @@ public partial class BoardView : Control
     }
 
     private static void RebindRow(TileSlotView[] tiles, PlayerState p, ICardDatabase db,
-        System.Action<TileSlotView, int> onMinionClicked)
+        System.Action<TileSlotView, int> onMinionClicked,
+        Dictionary<InstanceId, CardView> lookup)
     {
         for (int i = 0; i < tiles.Length; i++)
         {
@@ -171,7 +176,48 @@ public partial class BoardView : Control
             cv.Bind(occ, db.Get(occ.Card), onField: true);
             var capturedTile = tiles[i];
             cv.Clicked += iid => onMinionClicked(capturedTile, iid);
+            lookup[occ.Instance] = cv;
         }
+    }
+
+    public CardView? GetFieldCardView(InstanceId id)
+        => _fieldCardLookup.TryGetValue(id, out var cv) ? cv : null;
+
+    public PlayerInfoPanel GetHeroPanel(PlayerSide side)
+        => MyInfo.Side == side ? MyInfo : EnemyInfo;
+
+    public void SpawnDamageNumber(InstanceId target, int amount)
+    {
+        if (amount <= 0) return;
+        var cv = GetFieldCardView(target);
+        if (cv is null) return;
+        var pos = cv.GlobalPosition + cv.Size / 2;
+        DamageNumber.Spawn(this, pos, $"-{amount}", new Color(1f, 0.4f, 0.4f));
+    }
+
+    public void SpawnHealNumber(InstanceId target, int amount)
+    {
+        if (amount <= 0) return;
+        var cv = GetFieldCardView(target);
+        if (cv is null) return;
+        var pos = cv.GlobalPosition + cv.Size / 2;
+        DamageNumber.Spawn(this, pos, $"+{amount}", new Color(0.5f, 1f, 0.6f));
+    }
+
+    public void SpawnPlayerDamageNumber(PlayerSide side, int amount)
+    {
+        if (amount <= 0) return;
+        var panel = GetHeroPanel(side);
+        var pos = panel.GlobalPosition + panel.Size / 2;
+        DamageNumber.Spawn(this, pos, $"-{amount}", new Color(1f, 0.4f, 0.4f), fontSize: 44);
+    }
+
+    public void SpawnPlayerHealNumber(PlayerSide side, int amount)
+    {
+        if (amount <= 0) return;
+        var panel = GetHeroPanel(side);
+        var pos = panel.GlobalPosition + panel.Size / 2;
+        DamageNumber.Spawn(this, pos, $"+{amount}", new Color(0.5f, 1f, 0.6f), fontSize: 44);
     }
 
     private void OnMinionClicked(TileSlotView tile, int instanceId)

@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Threading.Tasks;
 using Godot;
 using ShadowCardSmash.Cards;
 using ShadowCardSmash.Domain;
@@ -9,6 +10,10 @@ namespace ShadowCardSmash.View;
 /// <summary>
 /// Glue between GameLoop and BoardView. Owns the input state machine and re-renders after every event chain.
 /// V1 runs hot seat (both players share one screen; LocalSide auto-tracks CurrentPlayer).
+///
+/// Event playback: after each Submit, the controller walks the slice of new BoardEvents and dispatches each to
+/// an animation routine, awaiting Godot tweens between events. Final Rebind happens after the chain completes.
+/// Input is locked while <see cref="_isAnimating"/> is true.
 /// </summary>
 public partial class BattleController : Node
 {
@@ -16,13 +21,15 @@ public partial class BattleController : Node
     private CardRegistry _registry = null!;
     private BoardView _board = null!;
 
-    // Input state machine.
     private enum Mode { Idle, AwaitPlayTarget, AwaitAttackTarget }
     private Mode _mode = Mode.Idle;
     private InstanceId _selectedHandInstance;
     private CardId _selectedCardId;
     private TargetSpec _selectedSpec;
     private InstanceId _selectedAttacker;
+
+    private bool _isAnimating;
+    private int _consumedEventCount;
 
     public PlayerSide LocalSide => _loop.State.CurrentPlayer; // hot-seat: always view current player
 
@@ -48,8 +55,6 @@ public partial class BattleController : Node
         var rng = new DeterministicRng(seed: (int)Time.GetTicksMsec(), counter: 0);
         _loop = new GameLoop(state, _registry, rng);
 
-        // V1 demo deck: half BloodSeller (1/1 OnPlay self-damage + draw), half TrainingDummy (0/3 Ward,
-        // no OnPlay) so the player can see the hand count actually shrink when they drop a Dummy.
         var deck = new List<CardId>();
         for (int i = 0; i < 20; i++) deck.Add(new CardId(2001));
         for (int i = 0; i < 20; i++) deck.Add(new CardId(1001));
@@ -58,15 +63,17 @@ public partial class BattleController : Node
         var second = new GameInitializer.SeatConfig(deck, HeroClass.Vampire, null);
         GameInitializer.Begin(_loop, seed: state.RandomSeed, first, second);
 
-        // V1: auto-confirm mulligan (no UI for mulligan yet).
         _loop.Submit(new MulliganAction(PlayerSide.First, System.Array.Empty<int>()));
         _loop.Submit(new MulliganAction(PlayerSide.Second, System.Array.Empty<int>()));
 
+        // Mark initial events as consumed so we don't animate game-setup retroactively.
+        _consumedEventCount = _loop.EventLog.Count;
         Rebind();
     }
 
     private void OnHandCardClicked(int sideIndex, int instanceId)
     {
+        if (_isAnimating) return;
         var side = (PlayerSide)sideIndex;
         if (side != LocalSide || _loop.IsGameOver) return;
 
@@ -74,16 +81,13 @@ public partial class BattleController : Node
         if (card is null) return;
         var script = _registry.Get(card.Card);
 
-        // Toggle off if user clicks the same card again.
         if (_mode == Mode.AwaitPlayTarget && _selectedHandInstance.Value == instanceId)
         {
             ResetMode();
             return;
         }
 
-        // Switching from another mode resets first.
         ResetMode();
-
         _selectedHandInstance = card.Instance;
         _selectedCardId = card.Card;
         _selectedSpec = script.PlayTarget;
@@ -96,7 +100,6 @@ public partial class BattleController : Node
             return;
         }
 
-        // Spell.
         if (_selectedSpec == TargetSpec.None)
         {
             TrySubmit(new PlayCardAction(LocalSide, card.Instance, null, null, null));
@@ -108,7 +111,7 @@ public partial class BattleController : Node
 
     private void OnTileClicked(int sideIndex, int tileIndex)
     {
-        if (_loop.IsGameOver) return;
+        if (_isAnimating || _loop.IsGameOver) return;
         var side = (PlayerSide)sideIndex;
 
         if (_mode == Mode.AwaitPlayTarget)
@@ -127,38 +130,32 @@ public partial class BattleController : Node
                     return;
             }
         }
-        // Clicking empty space in Idle or Attack mode just cancels selection.
         ResetMode();
     }
 
     private void OnMinionClicked(int sideIndex, int instanceId)
     {
-        if (_loop.IsGameOver) return;
+        if (_isAnimating || _loop.IsGameOver) return;
         var side = (PlayerSide)sideIndex;
         var instance = new InstanceId(instanceId);
 
-        // Spell aimed at a minion takes priority.
         if (_mode == Mode.AwaitPlayTarget)
         {
             var script = _registry.Get(_selectedCardId);
             if (script.CardType == CardType.Spell)
-            {
                 TrySubmit(new PlayCardAction(LocalSide, _selectedHandInstance, null, instance, null));
-            }
             return;
         }
 
-        // Attack target.
         if (_mode == Mode.AwaitAttackTarget)
         {
             if (side == LocalSide.Opponent())
                 TrySubmit(new AttackAction(LocalSide, _selectedAttacker, instance, null));
             else
-                ResetMode(); // reclicking own field cancels
+                ResetMode();
             return;
         }
 
-        // Idle: clicking own minion → enter attack mode if it can attack.
         if (side == LocalSide)
         {
             var attacker = _loop.State.GetPlayer(side).FindOnField(instance);
@@ -177,7 +174,7 @@ public partial class BattleController : Node
 
     private void OnHeroClicked(int sideIndex)
     {
-        if (_loop.IsGameOver) return;
+        if (_isAnimating || _loop.IsGameOver) return;
         var side = (PlayerSide)sideIndex;
 
         if (_mode == Mode.AwaitAttackTarget && side == LocalSide.Opponent())
@@ -196,28 +193,127 @@ public partial class BattleController : Node
 
     private void OnEndTurnClicked()
     {
-        if (_loop.IsGameOver) return;
+        if (_isAnimating || _loop.IsGameOver) return;
         if (_loop.State.Phase != GamePhase.Main) return;
         ResetMode();
         TrySubmit(new EndTurnAction(LocalSide));
     }
 
-    private void TrySubmit(IGameAction action)
+    /// <summary>
+    /// Fire-and-forget async dispatch: submit the action, animate the new events, then rebind.
+    /// Marked async void because it's an input-handler trampoline; exceptions are converted to status messages.
+    /// </summary>
+    private async void TrySubmit(IGameAction action)
     {
+        _isAnimating = true;
         try
         {
-            _loop.Submit(action);
-        }
-        catch (InvalidActionException e)
-        {
-            _board.SetStatus($"非法操作: {e.Message}");
+            try
+            {
+                _loop.Submit(action);
+            }
+            catch (InvalidActionException e)
+            {
+                _board.SetStatus($"非法操作: {e.Message}");
+                ResetMode();
+                Rebind();
+                return;
+            }
+
+            await PlayPendingEventsAsync();
             ResetMode();
             Rebind();
-            return;
         }
-        ResetMode();
-        Rebind();
+        finally
+        {
+            _isAnimating = false;
+        }
     }
+
+    private async Task PlayPendingEventsAsync()
+    {
+        var log = _loop.EventLog;
+        while (_consumedEventCount < log.Count)
+        {
+            var evt = log[_consumedEventCount];
+            _consumedEventCount++;
+            await PlayAnimationFor(evt);
+        }
+    }
+
+    private async Task PlayAnimationFor(BoardEvent evt)
+    {
+        switch (evt)
+        {
+            case MinionAttacksEvent atk:
+                await PlayAttackLunge(atk);
+                break;
+            case MinionDamagedEvent md when md.Amount > 0:
+                _board.SpawnDamageNumber(md.Target, md.Amount);
+                await SmallDelay(0.15);
+                break;
+            case MinionHealedEvent mh when mh.Amount > 0:
+                _board.SpawnHealNumber(mh.Target, mh.Amount);
+                await SmallDelay(0.15);
+                break;
+            case PlayerDamagedEvent pd when pd.Amount > 0:
+                _board.SpawnPlayerDamageNumber(pd.Target, pd.Amount);
+                await SmallDelay(0.20);
+                break;
+            case PlayerHealedEvent ph when ph.Amount > 0:
+                _board.SpawnPlayerHealNumber(ph.Target, ph.Amount);
+                await SmallDelay(0.20);
+                break;
+            case MinionDestroyedEvent destroyed:
+                await PlayDeathFade(destroyed.Instance);
+                break;
+        }
+    }
+
+    private async Task PlayAttackLunge(MinionAttacksEvent atk)
+    {
+        var attackerCv = _board.GetFieldCardView(atk.Attacker);
+        if (attackerCv is null) return;
+
+        Vector2 targetCenter;
+        if (atk.TargetMinion.HasValue)
+        {
+            var targetCv = _board.GetFieldCardView(atk.TargetMinion.Value);
+            if (targetCv is null) return;
+            targetCenter = targetCv.GlobalPosition + targetCv.Size / 2;
+        }
+        else if (atk.TargetPlayer.HasValue)
+        {
+            var panel = _board.GetHeroPanel(atk.TargetPlayer.Value);
+            targetCenter = panel.GlobalPosition + panel.Size / 2;
+        }
+        else return;
+
+        var origin = attackerCv.Position;
+        var attackerCenter = attackerCv.GlobalPosition + attackerCv.Size / 2;
+        var direction = (targetCenter - attackerCenter).Normalized();
+        var lungeTarget = origin + direction * 50;
+
+        var tween = attackerCv.CreateTween();
+        tween.TweenProperty(attackerCv, "position", lungeTarget, 0.13)
+             .SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
+        tween.TweenProperty(attackerCv, "position", origin, 0.18)
+             .SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
+        await ToSignal(tween, Tween.SignalName.Finished);
+    }
+
+    private async Task PlayDeathFade(InstanceId id)
+    {
+        var cv = _board.GetFieldCardView(id);
+        if (cv is null) return;
+        var tween = cv.CreateTween();
+        tween.TweenProperty(cv, "modulate:a", 0.0f, 0.25)
+             .SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.In);
+        await ToSignal(tween, Tween.SignalName.Finished);
+    }
+
+    private async Task SmallDelay(double seconds)
+        => await ToSignal(GetTree().CreateTimer(seconds), SceneTreeTimer.SignalName.Timeout);
 
     private void Rebind() => _board.Rebind(_loop.State, _registry, LocalSide);
 
@@ -232,7 +328,7 @@ public partial class BattleController : Node
 
     private void HighlightFriendlyEmptyTiles()
     {
-        var tiles = _board.MyTiles; // MyTiles now carry LocalSide after Rebind
+        var tiles = _board.MyTiles;
         var p = _loop.State.GetPlayer(LocalSide);
         for (int i = 0; i < tiles.Length; i++) tiles[i].Highlight(p.Field[i].IsEmpty);
     }
