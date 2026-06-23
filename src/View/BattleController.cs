@@ -231,6 +231,9 @@ public partial class BattleController : Node
         var popup = new PilePopup();
         AddChild(popup);
         popup.Populate(title, cards, _registry);
+        popup.CardHovered += iid => _board.HoverDetailForId(iid);
+        popup.CardHoverExited += () => _board.DetailPanel.HoverHide();
+        popup.Closed += () => _board.DetailPanel.HoverHide();
     }
 
     /// <summary>
@@ -279,6 +282,9 @@ public partial class BattleController : Node
     {
         switch (evt)
         {
+            case CardDrawnEvent drawn:
+                await PlayDrawAnim(drawn);
+                break;
             case MinionAttacksEvent atk:
                 await PlayAttackLunge(atk);
                 break;
@@ -299,9 +305,51 @@ public partial class BattleController : Node
                 await SmallDelay(0.20);
                 break;
             case MinionDestroyedEvent destroyed:
-                await PlayDeathFade(destroyed.Instance);
+                await PlaySlideToGraveyard(destroyed);
                 break;
         }
+    }
+
+    private async Task PlayDrawAnim(CardDrawnEvent evt)
+    {
+        var deckPile = _board.GetDeckPile(evt.Side);
+        Control handTarget = evt.Side == LocalSide ? (Control)_board.MyHand : _board.EnemyHand;
+        var cardSize = new Vector2(CardView.CardWidth, CardView.CardHeight);
+        Vector2 start = deckPile.GlobalPosition + deckPile.Size / 2 - cardSize / 2;
+        Vector2 end = handTarget.GlobalPosition + handTarget.Size / 2 - cardSize / 2;
+
+        var ghost = new CardView();
+        _board.AddChild(ghost);
+        ghost.BindFaceDown();
+        ghost.SetSize(cardSize);
+        ghost.GlobalPosition = start;
+        ghost.ZIndex = 50;
+
+        var tween = ghost.CreateTween();
+        tween.TweenProperty(ghost, "global_position", end, 0.32)
+             .SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
+        tween.Parallel().TweenProperty(ghost, "scale", new Vector2(0.85f, 0.85f), 0.32);
+        tween.TweenProperty(ghost, "modulate:a", 0.0f, 0.10);
+        tween.Chain().TweenCallback(Callable.From(ghost.QueueFree));
+        await ToSignal(tween, Tween.SignalName.Finished);
+    }
+
+    private async Task PlaySlideToGraveyard(MinionDestroyedEvent evt)
+    {
+        var cv = _board.GetFieldCardView(evt.Instance);
+        if (cv is null) return;
+
+        var grave = _board.GetGravePile(evt.Owner);
+        Vector2 endCenter = grave.GlobalPosition + grave.Size / 2;
+        Vector2 endTopLeft = endCenter - cv.Size / 2;
+
+        cv.ZIndex = 50;
+        var tween = cv.CreateTween().SetParallel();
+        tween.TweenProperty(cv, "global_position", endTopLeft, 0.35)
+             .SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.In);
+        tween.TweenProperty(cv, "scale", new Vector2(0.45f, 0.45f), 0.35);
+        tween.TweenProperty(cv, "modulate:a", 0.0f, 0.35);
+        await ToSignal(tween, Tween.SignalName.Finished);
     }
 
     private async Task PlayAttackLunge(MinionAttacksEvent atk)
@@ -333,16 +381,6 @@ public partial class BattleController : Node
              .SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
         tween.TweenProperty(attackerCv, "position", origin, 0.18)
              .SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
-        await ToSignal(tween, Tween.SignalName.Finished);
-    }
-
-    private async Task PlayDeathFade(InstanceId id)
-    {
-        var cv = _board.GetFieldCardView(id);
-        if (cv is null) return;
-        var tween = cv.CreateTween();
-        tween.TweenProperty(cv, "modulate:a", 0.0f, 0.25)
-             .SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.In);
         await ToSignal(tween, Tween.SignalName.Finished);
     }
 

@@ -16,6 +16,8 @@ public partial class BoardView : Control
 {
     public const int Margin = 16;
     public const int RowSeparation = 4;
+    public const int EdgeColumnWidth = 156;
+    public const int EdgeInfoGap = 90;   // vertical space reserved for info bar + margin
 
     [Signal] public delegate void HandCardClickedEventHandler(int sideIndex, int instanceId);
     [Signal] public delegate void TileClickedEventHandler(int sideIndex, int tileIndex);
@@ -63,37 +65,32 @@ public partial class BoardView : Control
         if (_builtUi) return;
         _builtUi = true;
 
+        // Inner VBox holds the rows. Horizontal offsets leave room for the edge-anchored pile columns.
+        int sideGutter = Margin + EdgeColumnWidth + 12;
         var root = new VBoxContainer
         {
             AnchorLeft = 0, AnchorTop = 0, AnchorRight = 1, AnchorBottom = 1,
-            OffsetLeft = Margin, OffsetTop = Margin, OffsetRight = -Margin, OffsetBottom = -Margin,
+            OffsetLeft = sideGutter, OffsetTop = Margin,
+            OffsetRight = -sideGutter, OffsetBottom = -Margin,
         };
         root.AddThemeConstantOverride("separation", RowSeparation);
         AddChild(root);
 
-        // Symmetric layout: every row spans the full width, mirrored top↔bottom about the central separator.
         EnemyInfo = new PlayerInfoPanel { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         EnemyInfo.HeroClicked += idx => EmitSignal(SignalName.HeroClicked, idx);
         root.AddChild(EnemyInfo);
 
         EnemyHand = new HandView { ShowFaces = false };
         EnemyHand.CardSelected += iid => EmitSignal(SignalName.HandCardClicked, (int)EnemyHand.Side, iid);
-        // No hover detail for enemy hand: face-down cards have nothing to inspect.
         root.AddChild(EnemyHand);
 
-        EnemyTiles = BuildFieldRowWithPiles(
-            root, isEnemy: true,
-            out EnemyTopLeftSlot, out EnemyDeck,
-            out EnemyTopRightSlot, out EnemyGrave);
+        EnemyTiles = BuildFieldRow(root);
 
         var sep = new HSeparator();
         sep.AddThemeConstantOverride("separation", 12);
         root.AddChild(sep);
 
-        MyTiles = BuildFieldRowWithPiles(
-            root, isEnemy: false,
-            out MyTopLeftSlot, out MyDeck,
-            out MyTopRightSlot, out MyGrave);
+        MyTiles = BuildFieldRow(root);
 
         MyHand = new HandView { ShowFaces = true };
         MyHand.CardSelected += iid => EmitSignal(SignalName.HandCardClicked, (int)MyHand.Side, iid);
@@ -129,27 +126,31 @@ public partial class BoardView : Control
         // Card detail side panel (hidden until hover or pin).
         DetailPanel = new CardDetailPanel();
         AddChild(DetailPanel);
+
+        // Pile columns anchored to the four screen corners, sized to span tile+hand area on each side.
+        EnemyTopLeftSlot = MakePileSlot();
+        EnemyDeck = MakePileSlot();
+        AddEdgePileColumn(EnemyTopLeftSlot, EnemyDeck, leftSide: true, topHalf: true);
+
+        EnemyTopRightSlot = MakePileSlot();
+        EnemyGrave = MakePileSlot();
+        AddEdgePileColumn(EnemyTopRightSlot, EnemyGrave, leftSide: false, topHalf: true);
+
+        MyTopLeftSlot = MakePileSlot();
+        MyDeck = MakePileSlot();
+        AddEdgePileColumn(MyTopLeftSlot, MyDeck, leftSide: true, topHalf: false);
+
+        MyTopRightSlot = MakePileSlot();
+        MyGrave = MakePileSlot();
+        AddEdgePileColumn(MyTopRightSlot, MyGrave, leftSide: false, topHalf: false);
     }
 
-    private TileSlotView[] BuildFieldRowWithPiles(
-        Container parent, bool isEnemy,
-        out PileView topLeft, out PileView bottomLeft,
-        out PileView topRight, out PileView bottomRight)
+    private TileSlotView[] BuildFieldRow(Container parent)
     {
         var row = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ShrinkCenter };
-        row.AddThemeConstantOverride("separation", 8);
+        row.AddThemeConstantOverride("separation", 12);
         parent.AddChild(row);
 
-        // Left flanking column: top (placeholder), bottom (deck).
-        var leftCol = new VBoxContainer();
-        leftCol.AddThemeConstantOverride("separation", 4);
-        row.AddChild(leftCol);
-        topLeft = MakePileSlot();
-        bottomLeft = MakePileSlot();
-        leftCol.AddChild(topLeft);
-        leftCol.AddChild(bottomLeft);
-
-        // 6 field tiles.
         var tiles = new TileSlotView[PlayerState.FieldSize];
         for (int i = 0; i < PlayerState.FieldSize; i++)
         {
@@ -158,24 +159,56 @@ public partial class BoardView : Control
             row.AddChild(tile);
             tiles[i] = tile;
         }
-
-        // Right flanking column: top (placeholder), bottom (graveyard).
-        var rightCol = new VBoxContainer();
-        rightCol.AddThemeConstantOverride("separation", 4);
-        row.AddChild(rightCol);
-        topRight = MakePileSlot();
-        bottomRight = MakePileSlot();
-        rightCol.AddChild(topRight);
-        rightCol.AddChild(bottomRight);
-
         return tiles;
     }
 
     private PileView MakePileSlot()
     {
-        var p = new PileView();
+        var p = new PileView { SizeFlagsVertical = SizeFlags.ExpandFill };
         p.Clicked += (sideIdx, kindIdx) => EmitSignal(SignalName.PileClicked, sideIdx, kindIdx);
         return p;
+    }
+
+    /// <summary>
+    /// Anchor a column of two PileViews to a screen corner. The column spans the player's tile + hand area:
+    /// for the top half it goes from below the enemy info bar to just above the central separator;
+    /// for the bottom half it mirrors below the separator down to above the my-info bar.
+    /// </summary>
+    private void AddEdgePileColumn(PileView upper, PileView lower, bool leftSide, bool topHalf)
+    {
+        var col = new VBoxContainer();
+        col.AddThemeConstantOverride("separation", 6);
+
+        col.AnchorLeft = leftSide ? 0 : 1;
+        col.AnchorRight = leftSide ? 0 : 1;
+        col.AnchorTop = topHalf ? 0 : 0.5f;
+        col.AnchorBottom = topHalf ? 0.5f : 1;
+
+        if (leftSide)
+        {
+            col.OffsetLeft = Margin;
+            col.OffsetRight = Margin + EdgeColumnWidth;
+        }
+        else
+        {
+            col.OffsetLeft = -(Margin + EdgeColumnWidth);
+            col.OffsetRight = -Margin;
+        }
+
+        if (topHalf)
+        {
+            col.OffsetTop = Margin + EdgeInfoGap;
+            col.OffsetBottom = -RowSeparation;
+        }
+        else
+        {
+            col.OffsetTop = RowSeparation;
+            col.OffsetBottom = -(Margin + EdgeInfoGap);
+        }
+
+        col.AddChild(upper);
+        col.AddChild(lower);
+        AddChild(col);
     }
 
     public void Rebind(GameState state, ICardDatabase db, PlayerSide localSide)
@@ -300,6 +333,29 @@ public partial class BoardView : Control
     }
 
     public void UnpinDetail() => DetailPanel.Unpin();
+
+    /// <summary>
+    /// Hover-show detail for any card by id, searching across hand/field/deck/graveyard. Used by PilePopup.
+    /// </summary>
+    public void HoverDetailForId(int instanceId)
+    {
+        if (_lastState is null || _lastDb is null) return;
+        var iid = new InstanceId(instanceId);
+        foreach (var p in _lastState.Players)
+        {
+            var hc = p.Hand.FirstOrDefault(c => c.Instance == iid);
+            if (hc is not null) { DetailPanel.ShowFor(hc, _lastDb.Get(hc.Card), onField: false, pin: false); return; }
+            var fc = p.FindOnField(iid);
+            if (fc is not null) { DetailPanel.ShowFor(fc, _lastDb.Get(fc.Card), onField: true, pin: false); return; }
+            var dc = p.Deck.FirstOrDefault(c => c.Instance == iid);
+            if (dc is not null) { DetailPanel.ShowFor(dc, _lastDb.Get(dc.Card), onField: false, pin: false); return; }
+            var gc = p.Graveyard.FirstOrDefault(c => c.Instance == iid);
+            if (gc is not null) { DetailPanel.ShowFor(gc, _lastDb.Get(gc.Card), onField: false, pin: false); return; }
+        }
+    }
+
+    public PileView GetDeckPile(PlayerSide side) => MyDeck.Side == side ? MyDeck : EnemyDeck;
+    public PileView GetGravePile(PlayerSide side) => MyGrave.Side == side ? MyGrave : EnemyGrave;
 
     public CardView? GetFieldCardView(InstanceId id)
         => _fieldCardLookup.TryGetValue(id, out var cv) ? cv : null;

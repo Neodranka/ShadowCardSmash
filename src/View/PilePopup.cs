@@ -11,6 +11,8 @@ namespace ShadowCardSmash.View;
 public partial class PilePopup : Control
 {
     [Signal] public delegate void ClosedEventHandler();
+    [Signal] public delegate void CardHoveredEventHandler(int instanceId);
+    [Signal] public delegate void CardHoverExitedEventHandler();
 
     private GridContainer _grid = null!;
     private Label _title = null!;
@@ -107,6 +109,8 @@ public partial class PilePopup : Control
             var cv = new CardView();
             _grid.AddChild(cv);
             cv.Bind(card, db.Get(card.Card), onField: false);
+            cv.HoverEntered += iid => EmitSignal(SignalName.CardHovered, iid);
+            cv.HoverExited += _ => EmitSignal(SignalName.CardHoverExited);
         }
     }
 
