@@ -16,6 +16,8 @@ public partial class BoardView : Control
 {
     public const int Margin = 16;
     public const int RowSeparation = 4;
+    // Tile row width = 6 slots * slot-width + 5 separations; info bars constrain themselves to this width.
+    public const int TileRowWidth = PlayerState.FieldSize * TileSlotView.Width + (PlayerState.FieldSize - 1) * 8;
 
     [Signal] public delegate void HandCardClickedEventHandler(int sideIndex, int instanceId);
     [Signal] public delegate void TileClickedEventHandler(int sideIndex, int tileIndex);
@@ -63,7 +65,6 @@ public partial class BoardView : Control
         if (_builtUi) return;
         _builtUi = true;
 
-        // Inner VBox spans the full viewport. Pile flanks now live INSIDE each FieldRow, so no side gutter is needed.
         var root = new VBoxContainer
         {
             AnchorLeft = 0, AnchorTop = 0, AnchorRight = 1, AnchorBottom = 1,
@@ -73,45 +74,58 @@ public partial class BoardView : Control
         root.AddThemeConstantOverride("separation", RowSeparation);
         AddChild(root);
 
-        EnemyInfo = new PlayerInfoPanel { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        // Enemy info — centered, capped at tile row width so its edges align with the field row.
+        EnemyInfo = new PlayerInfoPanel { CustomMinimumSize = new Vector2(TileRowWidth, 70) };
         EnemyInfo.HeroClicked += idx => EmitSignal(SignalName.HeroClicked, idx);
-        root.AddChild(EnemyInfo);
+        root.AddChild(WrapCentered(EnemyInfo));
 
+        // Enemy section: left flank | spacer | (hand + field) middle | spacer | right flank.
+        EnemyTopLeftSlot = MakePileSlot();
+        EnemyGrave = MakePileSlot();
+        EnemyTopRightSlot = MakePileSlot();
+        EnemyDeck = MakePileSlot();
         EnemyHand = new HandView { ShowFaces = false };
         EnemyHand.CardSelected += iid => EmitSignal(SignalName.HandCardClicked, (int)EnemyHand.Side, iid);
-        root.AddChild(EnemyHand);
+        EnemyTiles = BuildPlayerSection(
+            root, isTopSide: true,
+            EnemyHand,
+            placeholderUpper: EnemyTopLeftSlot, leftFlankLower: EnemyGrave,
+            placeholderUpper2: EnemyTopRightSlot, rightFlankLower: EnemyDeck);
 
-        // Enemy field row, with mirrored pile flanks (top-left=grave, top-right=deck).
-        EnemyTiles = BuildFieldRowWithFlanks(root,
-            out EnemyTopLeftSlot, out EnemyGrave,
-            out EnemyTopRightSlot, out EnemyDeck);
-
+        // Central divider.
         var sep = new HSeparator();
         sep.AddThemeConstantOverride("separation", 12);
         root.AddChild(sep);
 
-        // My field row, mirrored: bottom-left=deck, bottom-right=grave.
-        MyTiles = BuildFieldRowWithFlanks(root,
-            out MyTopLeftSlot, out MyDeck,
-            out MyTopRightSlot, out MyGrave);
-
+        // My section: middle is (field + hand). Flanks have piles ABOVE placeholders (deck/grave near HSep).
+        MyTopLeftSlot = MakePileSlot();
+        MyDeck = MakePileSlot();
+        MyTopRightSlot = MakePileSlot();
+        MyGrave = MakePileSlot();
         MyHand = new HandView { ShowFaces = true };
         MyHand.CardSelected += iid => EmitSignal(SignalName.HandCardClicked, (int)MyHand.Side, iid);
         MyHand.CardHovered += OnHandCardHovered;
         MyHand.CardHoverExited += _ => DetailPanel.HoverHide();
-        root.AddChild(MyHand);
+        MyTiles = BuildPlayerSection(
+            root, isTopSide: false,
+            MyHand,
+            placeholderUpper: MyTopLeftSlot, leftFlankLower: MyDeck,
+            placeholderUpper2: MyTopRightSlot, rightFlankLower: MyGrave);
 
-        // End-Turn row: right-aligned strip between MyHand and MyInfo.
-        var endTurnRow = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        root.AddChild(endTurnRow);
-        endTurnRow.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
-        EndTurnButton = new Button { Text = "结束回合", CustomMinimumSize = new Vector2(160, 56) };
-        EndTurnButton.Pressed += () => EmitSignal(SignalName.EndTurnClicked);
-        endTurnRow.AddChild(EndTurnButton);
-
-        MyInfo = new PlayerInfoPanel { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        MyInfo = new PlayerInfoPanel { CustomMinimumSize = new Vector2(TileRowWidth, 70) };
         MyInfo.HeroClicked += idx => EmitSignal(SignalName.HeroClicked, idx);
-        root.AddChild(MyInfo);
+        root.AddChild(WrapCentered(MyInfo));
+
+        // End Turn floats over the right edge, vertical center of the screen (the HSep area between the two sections).
+        EndTurnButton = new Button
+        {
+            Text = "结束回合",
+            CustomMinimumSize = new Vector2(160, 60),
+            AnchorLeft = 1, AnchorTop = 0.5f, AnchorRight = 1, AnchorBottom = 0.5f,
+            OffsetLeft = -176, OffsetTop = -30, OffsetRight = -16, OffsetBottom = 30,
+        };
+        EndTurnButton.Pressed += () => EmitSignal(SignalName.EndTurnClicked);
+        AddChild(EndTurnButton);
 
         // Status overlay — center of viewport.
         StatusLabel = new Label
@@ -129,57 +143,83 @@ public partial class BoardView : Control
     }
 
     /// <summary>
-    /// One field row: left pile column + spacer + 6 tile slots + spacer + right pile column.
-    /// Spacers (ExpandFill) push the pile columns to the screen edges; tiles stay centered in the middle.
-    /// Because the row sits inside the inner VBox, pile columns auto-align with the tile row Y.
+    /// Wraps a Control in an HBox with two ExpandFill spacers so the inner Control stays at its minimum width
+    /// and is horizontally centered. Used by the info bars to clamp them to TileRowWidth.
     /// </summary>
-    private TileSlotView[] BuildFieldRowWithFlanks(
-        Container parent,
-        out PileView leftUpper, out PileView leftLower,
-        out PileView rightUpper, out PileView rightLower)
+    private static Container WrapCentered(Control inner)
     {
         var row = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        row.AddThemeConstantOverride("separation", 8);
-        parent.AddChild(row);
+        row.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
+        row.AddChild(inner);
+        row.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
+        return row;
+    }
+
+    /// <summary>
+    /// Build one player's section: an HBox containing left flank | spacer | middle (hand+field stacked) | spacer | right flank.
+    /// Top side: hand is above field, flank cells stack placeholder ↑ then deck/grave ↓ (deck/grave near HSep).
+    /// Bottom side: field above hand, flank cells stack deck/grave ↑ then placeholder ↓ (deck/grave near HSep).
+    /// Either way the flanks are anchored to the screen edges via spacers, and span the entire section height.
+    /// </summary>
+    private TileSlotView[] BuildPlayerSection(
+        Container parent, bool isTopSide, HandView handView,
+        PileView placeholderUpper, PileView leftFlankLower,
+        PileView placeholderUpper2, PileView rightFlankLower)
+    {
+        var section = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        section.AddThemeConstantOverride("separation", 8);
+        parent.AddChild(section);
 
         // Left flank column.
-        leftUpper = MakePileSlot();
-        leftLower = MakePileSlot();
         var leftCol = new VBoxContainer();
-        leftCol.AddThemeConstantOverride("separation", 4);
-        leftCol.AddChild(leftUpper);
-        leftCol.AddChild(leftLower);
-        row.AddChild(leftCol);
+        leftCol.AddThemeConstantOverride("separation", RowSeparation);
+        if (isTopSide) { leftCol.AddChild(placeholderUpper); leftCol.AddChild(leftFlankLower); }
+        else           { leftCol.AddChild(leftFlankLower); leftCol.AddChild(placeholderUpper); }
+        section.AddChild(leftCol);
 
-        // Left spacer pushes left flank to the screen edge.
-        row.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
+        section.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
 
-        // Six field tiles, centered between the spacers.
-        var tilesRow = new HBoxContainer();
-        tilesRow.AddThemeConstantOverride("separation", 8);
-        row.AddChild(tilesRow);
+        // Middle column = hand + field (order depends on side).
+        var middle = new VBoxContainer();
+        middle.AddThemeConstantOverride("separation", RowSeparation);
         var tiles = new TileSlotView[PlayerState.FieldSize];
+        var fieldRow = BuildBareFieldRow(tiles);
+        if (isTopSide)
+        {
+            middle.AddChild(handView);
+            middle.AddChild(fieldRow);
+        }
+        else
+        {
+            middle.AddChild(fieldRow);
+            middle.AddChild(handView);
+        }
+        section.AddChild(middle);
+
+        section.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
+
+        // Right flank column.
+        var rightCol = new VBoxContainer();
+        rightCol.AddThemeConstantOverride("separation", RowSeparation);
+        if (isTopSide) { rightCol.AddChild(placeholderUpper2); rightCol.AddChild(rightFlankLower); }
+        else           { rightCol.AddChild(rightFlankLower); rightCol.AddChild(placeholderUpper2); }
+        section.AddChild(rightCol);
+
+        return tiles;
+    }
+
+    private HBoxContainer BuildBareFieldRow(TileSlotView[] tilesOut)
+    {
+        var row = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ShrinkCenter };
+        row.AddThemeConstantOverride("separation", 8);
         for (int i = 0; i < PlayerState.FieldSize; i++)
         {
             var tile = new TileSlotView { TileIndex = i };
             tile.TileClicked += idx => EmitSignal(SignalName.TileClicked, (int)tile.Side, idx);
-            tilesRow.AddChild(tile);
-            tiles[i] = tile;
+            row.AddChild(tile);
+            tilesOut[i] = tile;
         }
-
-        // Right spacer pushes right flank to the screen edge.
-        row.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
-
-        // Right flank column.
-        rightUpper = MakePileSlot();
-        rightLower = MakePileSlot();
-        var rightCol = new VBoxContainer();
-        rightCol.AddThemeConstantOverride("separation", 4);
-        rightCol.AddChild(rightUpper);
-        rightCol.AddChild(rightLower);
-        row.AddChild(rightCol);
-
-        return tiles;
+        return row;
     }
 
     private PileView MakePileSlot()
