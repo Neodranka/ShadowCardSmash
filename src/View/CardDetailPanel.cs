@@ -153,7 +153,16 @@ public partial class CardDetailPanel : PanelContainer
         if ((keywords & Keyword.Ward) == Keyword.Ward) parts.Add("【守护】");
         if ((keywords & Keyword.Rush) == Keyword.Rush) parts.Add("【突进】");
         if ((keywords & Keyword.Storm) == Keyword.Storm) parts.Add("【疾驰】");
-        if ((keywords & Keyword.Barrier) == Keyword.Barrier) parts.Add("【护盾】");
+        // Barrier: show actual stack count when on field; only show 【屏障】 in hand if printed on the card.
+        if (onField)
+        {
+            if (card.BarrierStacks > 0)
+                parts.Add(card.BarrierStacks > 1 ? $"【屏障×{card.BarrierStacks}】" : "【屏障】");
+        }
+        else if ((keywords & Keyword.Barrier) == Keyword.Barrier)
+        {
+            parts.Add("【屏障】");
+        }
         if ((keywords & Keyword.Stealth) == Keyword.Stealth) parts.Add("【潜行】");
         if (onField && card.IsEvolved) parts.Add("✦进化");
         if (onField && card.IsSilenced) parts.Add("✕沉默");

@@ -17,7 +17,7 @@ public sealed record AttackAction(
         var attacker = state.GetPlayer(Issuer).FindOnField(Attacker);
         if (attacker is null) return ActionResult.Fail("攻击随从不在己方场上");
         if (!attacker.CanAttackThisTurn) return ActionResult.Fail("此随从本回合不能攻击");
-        if (attacker.CurrentAttack <= 0) return ActionResult.Fail("攻击力为 0，无法攻击");
+        // 0 攻击力也允许出招 —— 双方互伤 0，仍触发屏障消耗与"受到伤害"事件。
 
         if (TargetMinion.HasValue == TargetPlayer.HasValue)
             return ActionResult.Fail("攻击目标必须是随从或英雄之一");

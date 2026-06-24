@@ -26,6 +26,7 @@ public partial class CardView : PanelContainer
     private Label _atk = null!;
     private Label _hp = null!;
     private Panel _artPanel = null!;
+    private CardShieldOverlay _shieldOverlay = null!;
     private StyleBoxFlat _stylebox = null!;
     private StyleBoxFlat _costStyle = null!;
     private StyleBoxFlat _artStyle = null!;
@@ -121,6 +122,11 @@ public partial class CardView : PanelContainer
         };
         _hp.AddThemeFontSizeOverride("font_size", 24);
         _innerRoot.AddChild(_hp);
+
+        // Shield overlay — added last so it draws on top of art / labels.
+        _shieldOverlay = new CardShieldOverlay();
+        AddChild(_shieldOverlay);
+        _shieldOverlay.Visible = false;
     }
 
     public void Bind(RuntimeCard card, ICardScript script, bool onField)
@@ -156,6 +162,18 @@ public partial class CardView : PanelContainer
 
         ApplyAccentColors(card, script, onField);
         TooltipText = $"{script.Name}\n{script.Description}";
+
+        // Shield overlay only on the battlefield, never in hand.
+        if (onField)
+        {
+            bool ward = card.HasKeyword(Keyword.Ward);
+            bool barrier = card.BarrierStacks > 0;
+            _shieldOverlay.Refresh(ward, barrier);
+        }
+        else
+        {
+            _shieldOverlay.Refresh(false, false);
+        }
     }
 
     /// <summary>

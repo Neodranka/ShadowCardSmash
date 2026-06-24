@@ -317,6 +317,9 @@ public partial class BoardView : Control
             },
             _ => "",
         };
+
+        // Keep the pinned detail panel in sync with the latest state (barrier stacks, current stats, etc.).
+        RefreshPinnedDetail();
     }
 
     private void RebindRow(TileSlotView[] tiles, PlayerState p, ICardDatabase db,
@@ -385,19 +388,41 @@ public partial class BoardView : Control
         }
     }
 
+    private InstanceId _pinnedDetailId = InstanceId.None;
+
     public void PinDetail(InstanceId id)
     {
         if (_lastState is null || _lastDb is null) return;
+        _pinnedDetailId = id;
         foreach (var p in _lastState.Players)
         {
             var hc = p.Hand.FirstOrDefault(c => c.Instance == id);
             if (hc is not null) { DetailPanel.ShowFor(hc, _lastDb.Get(hc.Card), onField: false, pin: true); return; }
-            var fc = p.FindOnField(id);
+            var fc = p.FindOnFieldOrTerrain(id);
             if (fc is not null) { DetailPanel.ShowFor(fc, _lastDb.Get(fc.Card), onField: true, pin: true); return; }
         }
     }
 
-    public void UnpinDetail() => DetailPanel.Unpin();
+    public void UnpinDetail()
+    {
+        _pinnedDetailId = InstanceId.None;
+        DetailPanel.Unpin();
+    }
+
+    /// <summary>If the detail panel is pinned, re-resolve it from current state so badges + stats stay live.</summary>
+    private void RefreshPinnedDetail()
+    {
+        if (_pinnedDetailId.Value == 0 || _lastState is null || _lastDb is null) return;
+        foreach (var p in _lastState.Players)
+        {
+            var hc = p.Hand.FirstOrDefault(c => c.Instance == _pinnedDetailId);
+            if (hc is not null) { DetailPanel.ShowFor(hc, _lastDb.Get(hc.Card), onField: false, pin: true); return; }
+            var fc = p.FindOnFieldOrTerrain(_pinnedDetailId);
+            if (fc is not null) { DetailPanel.ShowFor(fc, _lastDb.Get(fc.Card), onField: true, pin: true); return; }
+        }
+        // Pinned card is gone (destroyed / removed) → unpin.
+        UnpinDetail();
+    }
 
     /// <summary>
     /// Hover-show detail for any card by id, searching across hand/field/deck/graveyard. Used by PilePopup.

@@ -584,7 +584,7 @@ public partial class BattleController : Node
 
     private static string? DiagnoseAttackBlocker(RuntimeCard m)
     {
-        if (m.CurrentAttack <= 0) return "攻击力为 0，无法攻击";
+        // 0 攻击力允许出招（伤害为 0 仍消耗屏障）。
         if (m.AttacksThisTurn > 0) return "本回合已经攻击过";
         if (m.SummonedThisTurn && !m.HasKeyword(Keyword.Rush) && !m.HasKeyword(Keyword.Storm))
             return "召唤晕眩中，下回合才能攻击";

@@ -13,7 +13,8 @@ public static class EffectPrimitives
 
     public static bool DamageMinion(GameContext ctx, RuntimeCard target, int amount)
     {
-        if (amount <= 0 || target.Zone != Zone.Field) return false;
+        // 0 伤害也算"受到伤害"：仍然消耗屏障 + 触发事件流程；只有负数被拒。
+        if (amount < 0 || target.Zone != Zone.Field) return false;
 
         if (target.BarrierStacks > 0)
         {
@@ -48,9 +49,9 @@ public static class EffectPrimitives
 
     public static void DamagePlayer(GameContext ctx, PlayerSide target, int amount)
     {
-        if (amount <= 0) return;
+        if (amount < 0) return;
         var p = ctx.State.GetPlayer(target);
-        // Player barrier absorbs one whole damage instance.
+        // Player barrier absorbs one whole damage instance regardless of amount (even 0).
         if (p.BarrierStacks > 0)
         {
             p.BarrierStacks--;
