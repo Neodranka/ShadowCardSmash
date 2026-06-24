@@ -28,6 +28,12 @@ public interface ICardScript
     Rarity Rarity { get; }
     IReadOnlyList<string> Tags { get; }
     TargetSpec PlayTarget { get; }
+    /// <summary>How many minion targets the main play action wants when PlayTarget is Single*. Default 1.</summary>
+    int TargetsToPick { get; }
+    /// <summary>Optional choice menu shown before play resolves. Empty = no choice.</summary>
+    IReadOnlyList<CardChoice> Choices { get; }
+    /// <summary>How many of <see cref="Choices"/> the player must select. Default 1.</summary>
+    int ChoicesToPick { get; }
 
     // Stat hooks (only meaningful for minions/amulets; spells return 0).
     int BaseAttack { get; }

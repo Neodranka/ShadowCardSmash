@@ -33,6 +33,9 @@ public abstract class CardScript : ICardScript
     public virtual Rarity Rarity => Data?.Rarity ?? Rarity.Bronze;
     public virtual IReadOnlyList<string> Tags => Data?.Tags ?? Array.Empty<string>();
     public virtual TargetSpec PlayTarget => TargetSpec.None;
+    public virtual int TargetsToPick => 1;
+    public virtual IReadOnlyList<CardChoice> Choices => Array.Empty<CardChoice>();
+    public virtual int ChoicesToPick => 1;
 
     public virtual int BaseAttack => Data?.BaseAttack ?? 0;
     public virtual int BaseHealth => Data?.BaseHealth ?? 0;

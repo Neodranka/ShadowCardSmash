@@ -14,8 +14,13 @@ public sealed class EmpireWallRadovan : MinionCard
 {
     public override void OnPlay(GameContext ctx)
     {
-        // 排除自己（cardId 已在场，SummonUnique 内部走 cardId 唯一性，不会再召唤一份）。
-        ctx.SummonUniqueFromDeck(ctx.SourceSide, s => s.Tags.Contains("布伦哈尔") && s.Id != Id);
+        // "我方场上不存在的布伦哈尔"：按 CardId 过滤掉所有已在场的布伦哈尔（自身已落地、其他副本、其他卡）。
+        var onField = new HashSet<CardId>();
+        foreach (var tile in ctx.Owner.Field)
+            if (tile.Occupant is { } m) onField.Add(m.Card);
+
+        ctx.SummonUniqueFromDeck(ctx.SourceSide,
+            s => s.Tags.Contains("布伦哈尔") && !onField.Contains(s.Id));
     }
 
     public override void OnFieldMinionEntered(GameContext ctx, RuntimeCard newcomer)

@@ -11,7 +11,9 @@ public sealed record PlayCardAction(
     InstanceId HandInstance,
     int? TileIndex,
     InstanceId? TargetMinion,
-    PlayerSide? TargetPlayer
+    PlayerSide? TargetPlayer,
+    InstanceId[]? ExtraTargets = null,
+    int[]? ChoiceIndices = null
 ) : IGameAction
 {
     public ActionResult Validate(GameState state)
@@ -60,15 +62,17 @@ public sealed record PlayCardAction(
         ctx.Loop.Publish(new CardPlayedEvent(Issuer, card.Instance, card.Card), ctx);
 
         // Resolve placement / spell.
+        var pickedTargets = ResolveAllTargets(state);
         if (script.CardType == CardType.Spell)
         {
             card.Zone = Zone.Graveyard;
             p.Graveyard.Add(card);
-            RuntimeCard? pickedMinion = ResolvePickedMinion(state);
             ctx.SourceSide = Issuer;
             ctx.Source = card;
-            ctx.PickedTarget = pickedMinion;
+            ctx.PickedTarget = pickedTargets.Count > 0 ? pickedTargets[0] : null;
+            ctx.PickedTargets = pickedTargets;
             ctx.PickedPlayerTarget = TargetPlayer;
+            ctx.PickedChoices = ChoiceIndices ?? System.Array.Empty<int>();
             script.OnPlay(ctx);
         }
         else
@@ -106,13 +110,44 @@ public sealed record PlayCardAction(
 
             ctx.SourceSide = Issuer;
             ctx.Source = card;
-            ctx.PickedTarget = ResolvePickedMinion(state);
+            ctx.PickedTarget = pickedTargets.Count > 0 ? pickedTargets[0] : null;
+            ctx.PickedTargets = pickedTargets;
             ctx.PickedPlayerTarget = TargetPlayer;
+            ctx.PickedChoices = ChoiceIndices ?? System.Array.Empty<int>();
             if (!card.IsSilenced) script.OnPlay(ctx);
 
             // Notify all field cards that a new minion just entered.
             if (script.CardType == CardType.Minion) EffectPrimitives.NotifyMinionEntered(ctx, card);
         }
+    }
+
+    private List<RuntimeCard> ResolveAllTargets(GameState state)
+    {
+        var list = new List<RuntimeCard>();
+        if (TargetMinion.HasValue)
+        {
+            var t = FindAnywhere(state, TargetMinion.Value);
+            if (t is not null) list.Add(t);
+        }
+        if (ExtraTargets is not null)
+        {
+            foreach (var id in ExtraTargets)
+            {
+                var t = FindAnywhere(state, id);
+                if (t is not null) list.Add(t);
+            }
+        }
+        return list;
+    }
+
+    private static RuntimeCard? FindAnywhere(GameState state, InstanceId id)
+    {
+        foreach (var side in new[] { PlayerSide.First, PlayerSide.Second })
+        {
+            var t = state.GetPlayer(side).FindOnField(id);
+            if (t is not null) return t;
+        }
+        return null;
     }
 
     private RuntimeCard? ResolvePickedMinion(GameState state)

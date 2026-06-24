@@ -23,6 +23,10 @@ public sealed class GameContext
     public RuntimeCard? PickedTarget { get; internal set; }
     public PlayerSide? PickedPlayerTarget { get; internal set; }
     public int? PickedTileIndex { get; internal set; }
+    /// <summary>All minion targets selected for this card (length matches script.TargetsToPick).</summary>
+    public IReadOnlyList<RuntimeCard> PickedTargets { get; internal set; } = System.Array.Empty<RuntimeCard>();
+    /// <summary>Indices the player chose from CardScript.Choices.</summary>
+    public IReadOnlyList<int> PickedChoices { get; internal set; } = System.Array.Empty<int>();
 
     public GameContext(GameState state, IRng rng, GameLoop loop, ICardDatabase cardDb, PlayerSide sourceSide)
     {
@@ -46,6 +50,8 @@ public sealed class GameContext
         PickedTarget = PickedTarget,
         PickedPlayerTarget = PickedPlayerTarget,
         PickedTileIndex = PickedTileIndex,
+        PickedTargets = PickedTargets,
+        PickedChoices = PickedChoices,
     };
 
     // === Effect primitives (facade) ===

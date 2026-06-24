@@ -22,12 +22,17 @@ public partial class BattleController : Node
     private CardRegistry _registry = null!;
     private BoardView _board = null!;
 
-    private enum Mode { Idle, AwaitPlayTarget, AwaitAttackTarget, AwaitEvolveTarget }
+    private enum Mode { Idle, AwaitPlayTarget, AwaitAttackTarget, AwaitEvolveTarget, AwaitChoice }
     private Mode _mode = Mode.Idle;
     private InstanceId _selectedHandInstance;
     private CardId _selectedCardId;
     private TargetSpec _selectedSpec;
     private InstanceId _selectedAttacker;
+
+    // Multi-target / choice flow state.
+    private readonly List<InstanceId> _pickedTargets = new();
+    private int _targetsNeeded = 1;
+    private int[]? _pickedChoices;
 
     private bool _isAnimating;
     private int _consumedEventCount;
@@ -113,14 +118,75 @@ public partial class BattleController : Node
             return;
         }
 
-        if (_selectedSpec == TargetSpec.None)
+        // Spell — three sub-cases: choice first, then target.
+        if (script.Choices.Count > 0)
         {
-            TrySubmit(new PlayCardAction(LocalSide, card.Instance, null, null, null));
+            OpenChoicePopup(script);
             return;
         }
+
+        if (_selectedSpec == TargetSpec.None)
+        {
+            SubmitPlayCard();
+            return;
+        }
+
+        BeginSpellTargetPick(script.PlayTarget, script.TargetsToPick, script.Name, card.Instance);
+    }
+
+    private void OpenChoicePopup(ICardScript script)
+    {
+        _mode = Mode.AwaitChoice;
+        var popup = new ChoicePopup();
+        AddChild(popup);
+        popup.Setup($"{script.Name} — 抉择 ({script.ChoicesToPick}/{script.Choices.Count})",
+            script.Choices, script.ChoicesToPick);
+        popup.ChoiceConfirmed += idx => OnChoiceConfirmed(script, idx);
+        popup.Cancelled += () => ResetMode();
+    }
+
+    private void OnChoiceConfirmed(ICardScript script, int[] indices)
+    {
+        _pickedChoices = indices;
+        // For ChoicesToPick=1 use the chosen option's target spec to drive the next step.
+        // Future M-choose-N: combine target specs across selected choices.
+        if (indices.Length == 0) { ResetMode(); return; }
+        var chosen = script.Choices[indices[0]];
+        if (chosen.TargetForChoice == TargetSpec.None)
+        {
+            SubmitPlayCard();
+        }
+        else
+        {
+            BeginSpellTargetPick(chosen.TargetForChoice, chosen.TargetsForChoice, script.Name, _selectedHandInstance);
+        }
+    }
+
+    private void BeginSpellTargetPick(TargetSpec spec, int count, string cardName, InstanceId handInstance)
+    {
+        _selectedSpec = spec;
+        _targetsNeeded = Math.Max(1, count);
+        _pickedTargets.Clear();
         _mode = Mode.AwaitPlayTarget;
-        _board.SetStatus($"为 {script.Name} 选择一个目标（右键/Esc 取消）");
-        _board.PinDetail(card.Instance);
+        _board.PinDetail(handInstance);
+        RefreshTargetStatus(cardName);
+    }
+
+    private void RefreshTargetStatus(string cardName)
+    {
+        _board.SetStatus($"为 {cardName} 选择目标 ({_pickedTargets.Count}/{_targetsNeeded})（右键/Esc 取消）");
+    }
+
+    private void SubmitPlayCard()
+    {
+        InstanceId? primary = _pickedTargets.Count > 0 ? _pickedTargets[0] : null;
+        InstanceId[]? extras = _pickedTargets.Count > 1 ? _pickedTargets.Skip(1).ToArray() : null;
+        TrySubmit(new PlayCardAction(LocalSide, _selectedHandInstance,
+            TileIndex: null,
+            TargetMinion: primary,
+            TargetPlayer: null,
+            ExtraTargets: extras,
+            ChoiceIndices: _pickedChoices));
     }
 
     private void OnTileClicked(int sideIndex, int tileIndex)
@@ -164,7 +230,19 @@ public partial class BattleController : Node
         {
             var script = _registry.Get(_selectedCardId);
             if (script.CardType == CardType.Spell)
-                TrySubmit(new PlayCardAction(LocalSide, _selectedHandInstance, null, instance, null));
+            {
+                // Multi-target: accumulate clicks until we have enough.
+                if (_pickedTargets.Contains(instance)) return; // ignore duplicate
+                _pickedTargets.Add(instance);
+                if (_pickedTargets.Count >= _targetsNeeded)
+                {
+                    SubmitPlayCard();
+                }
+                else
+                {
+                    RefreshTargetStatus(script.Name);
+                }
+            }
             return;
         }
 
@@ -441,10 +519,16 @@ public partial class BattleController : Node
         _mode = Mode.Idle;
         _selectedHandInstance = InstanceId.None;
         _selectedAttacker = InstanceId.None;
+        _pickedTargets.Clear();
+        _targetsNeeded = 1;
+        _pickedChoices = null;
         _board.SetStatus("");
         _board.ClearHighlights();
         _board.UnpinDetail();
         if (_board.MyEvolveButton is not null) _board.MyEvolveButton.SetActive(false);
+        // Close any open choice popup.
+        foreach (var c in GetChildren())
+            if (c is ChoicePopup p) p.QueueFree();
     }
 
     /// <summary>
