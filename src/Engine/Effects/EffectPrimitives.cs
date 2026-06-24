@@ -329,21 +329,25 @@ public static class EffectPrimitives
     }
 
     // ===== Barrier =====
+    // V1 设计：屏障是二值（有/无），同时只能 1 层。重复获取无效。
+    // BarrierStacks 字段类型保持 int 以便将来扩展为多层屏障，但当前所有路径都 cap 到 1。
 
     public static void GiveBarrier(GameContext ctx, RuntimeCard target, int stacks = 1)
     {
         if (stacks <= 0 || target.Zone != Zone.Field) return;
-        target.BarrierStacks += stacks;
+        if (target.BarrierStacks > 0) return; // 已有屏障 → no-op
+        target.BarrierStacks = 1;
         target.AddKeyword(Keyword.Barrier);
-        ctx.Loop.Publish(new BarrierGainedEvent(target.Instance, stacks), ctx);
+        ctx.Loop.Publish(new BarrierGainedEvent(target.Instance, 1), ctx);
     }
 
     public static void GiveBarrierToPlayer(GameContext ctx, PlayerSide side, int stacks = 1)
     {
         if (stacks <= 0) return;
         var p = ctx.State.GetPlayer(side);
-        p.BarrierStacks += stacks;
-        ctx.Loop.Publish(new PlayerBarrierGainedEvent(side, stacks), ctx);
+        if (p.BarrierStacks > 0) return; // 已有屏障 → no-op
+        p.BarrierStacks = 1;
+        ctx.Loop.Publish(new PlayerBarrierGainedEvent(side, 1), ctx);
     }
 
     // ===== Search / structured draw =====

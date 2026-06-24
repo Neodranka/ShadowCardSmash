@@ -4,7 +4,7 @@ using ShadowCardSmash.Engine;
 namespace ShadowCardSmash.Cards.Neutral;
 
 /// <summary>
-/// 护盾术 — 2 费法术。选择一个友方随从，为其添加屏障(强化4)，并使我方玩家获得屏障(1层)。
+/// 护盾术 — 2 费中立法术。选择一个友方随从为其添加屏障；我方玩家也获得屏障。
 /// </summary>
 [Card(1011)]
 public sealed class ShieldSpell : SpellCard
@@ -13,7 +13,7 @@ public sealed class ShieldSpell : SpellCard
 
     public override void OnPlay(GameContext ctx)
     {
-        if (ctx.PickedTarget is { } target) ctx.GiveBarrier(target, stacks: 4);
-        ctx.GiveBarrier(ctx.SourceSide, stacks: 1);
+        if (ctx.PickedTarget is { } target) ctx.GiveBarrier(target);
+        ctx.GiveBarrier(ctx.SourceSide);
     }
 }

@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_card")
 Name = "护盾术"
-Description = "选择一个友方随从，为其添加屏障(强化4)；使我方玩家也获得屏障。"
+Description = "选择一个友方随从为其添加屏障；我方玩家也获得屏障。"
 Cost = 2
 BaseAttack = 0
 BaseHealth = 0
