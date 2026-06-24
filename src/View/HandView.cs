@@ -22,10 +22,8 @@ public partial class HandView : HBoxContainer
         SizeFlagsHorizontal = SizeFlags.ShrinkCenter;
     }
 
-    public void Rebind(IReadOnlyList<RuntimeCard> hand, ICardDatabase db)
+    public void Rebind(IReadOnlyList<RuntimeCard> hand, ICardDatabase db, int viewerMana = 0)
     {
-        // Remove from tree immediately, backwards so indices stay valid.
-        // QueueFree alone defers to end of frame, which leaves stale slots in the HBox layout this frame.
         for (int i = GetChildCount() - 1; i >= 0; i--)
         {
             var child = GetChild(i);
@@ -38,14 +36,13 @@ public partial class HandView : HBoxContainer
             AddChild(cv);
             if (ShowFaces)
             {
-                cv.Bind(card, db.Get(card.Card), onField: false);
+                cv.Bind(card, db.Get(card.Card), onField: false, viewerMana: viewerMana);
                 cv.Clicked += OnCardClicked;
                 cv.HoverEntered += iid => EmitSignal(SignalName.CardHovered, iid);
                 cv.HoverExited += iid => EmitSignal(SignalName.CardHoverExited, iid);
             }
             else
             {
-                // Opponent hand in hot seat: render as opaque card backs (no text leak).
                 cv.BindFaceDown();
             }
         }

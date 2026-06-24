@@ -129,7 +129,7 @@ public partial class CardView : PanelContainer
         _shieldOverlay.Visible = false;
     }
 
-    public void Bind(RuntimeCard card, ICardScript script, bool onField)
+    public void Bind(RuntimeCard card, ICardScript script, bool onField, int viewerMana = 0)
     {
         BuildUi();
         Instance = card.Instance;
@@ -137,7 +137,23 @@ public partial class CardView : PanelContainer
         IsOnField = onField;
         _innerRoot.Visible = true;
 
-        _cost.Text = script.Cost.ToString();
+        // Enhance preview: when viewing this card in hand and the owner has enough mana to trigger 强化,
+        // the cost badge shows the enhance value in green.
+        bool enhanceActive = !onField && script.EnhanceCost > 0 && viewerMana >= script.EnhanceCost;
+        int displayCost = enhanceActive ? script.EnhanceCost : script.Cost;
+        _cost.Text = displayCost.ToString();
+        if (enhanceActive)
+        {
+            _costStyle.BgColor = new Color(0.20f, 0.65f, 0.30f);    // green pill
+            _costStyle.BorderColor = new Color(0.65f, 1f, 0.55f);
+            _cost.Modulate = new Color(1f, 1f, 1f);
+        }
+        else
+        {
+            _costStyle.BgColor = new Color(0.15f, 0.35f, 0.70f);    // default blue pill
+            _costStyle.BorderColor = new Color(0.7f, 0.85f, 1f);
+            _cost.Modulate = new Color(1f, 1f, 1f);
+        }
 
         if (script.CardType == CardType.Minion)
         {

@@ -295,8 +295,8 @@ public partial class BoardView : Control
         MyInfo.Rebind(me, myTurn);
         EnemyInfo.Rebind(enemy, !myTurn);
 
-        MyHand.Rebind(me.Hand, db);
-        EnemyHand.Rebind(enemy.Hand, db);
+        MyHand.Rebind(me.Hand, db, me.Mana);
+        EnemyHand.Rebind(enemy.Hand, db, 0); // 对手手牌脸朝下，不需要强化预览
 
         _fieldCardLookup.Clear();
         RebindRow(MyTiles, me, db, OnMinionClicked, _fieldCardLookup);

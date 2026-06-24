@@ -34,6 +34,8 @@ public partial class BattleController : Node
     private readonly List<InstanceId> _pickedTargets = new();
     private int _targetsNeeded = 1;
     private int[]? _pickedChoices;
+    /// <summary>Tile chosen for a minion/amulet that still needs to pick targets before submission.</summary>
+    private int? _pendingTileIndex;
 
     private bool _isAnimating;
     private int _consumedEventCount;
@@ -198,7 +200,7 @@ public partial class BattleController : Node
         InstanceId? primary = _pickedTargets.Count > 0 ? _pickedTargets[0] : null;
         InstanceId[]? extras = _pickedTargets.Count > 1 ? _pickedTargets.Skip(1).ToArray() : null;
         TrySubmit(new PlayCardAction(LocalSide, _selectedHandInstance,
-            TileIndex: null,
+            TileIndex: _pendingTileIndex,    // null for spells, set for minion/amulet that needed targeting
             TargetMinion: primary,
             TargetPlayer: null,
             ExtraTargets: extras,
@@ -223,6 +225,15 @@ public partial class BattleController : Node
                         _board.SetStatus($"{script.Name} 不能放在场地槽位");
                         return;
                     }
+                    if (script.PlayTarget != TargetSpec.None && _pendingTileIndex is null)
+                    {
+                        // 还需要选 target：先把 tile 存起来，进入"等待目标"子阶段。
+                        _pendingTileIndex = tileIndex;
+                        _targetsNeeded = Math.Max(1, script.TargetsToPick);
+                        _pickedTargets.Clear();
+                        _board.SetStatus($"为 {script.Name} 选择目标 (0/{_targetsNeeded})（右键/Esc 取消）");
+                        return;
+                    }
                     TrySubmit(new PlayCardAction(LocalSide, _selectedHandInstance, tileIndex, null, null));
                     return;
                 case CardType.Spell:
@@ -245,19 +256,16 @@ public partial class BattleController : Node
         if (_mode == Mode.AwaitPlayTarget)
         {
             var script = _registry.Get(_selectedCardId);
-            if (script.CardType == CardType.Spell)
+            bool isMinionAwaitingTarget = (script.CardType == CardType.Minion || script.CardType == CardType.Amulet)
+                                           && _pendingTileIndex.HasValue;
+            if (script.CardType == CardType.Spell || isMinionAwaitingTarget)
             {
-                // Multi-target: accumulate clicks until we have enough.
                 if (_pickedTargets.Contains(instance)) return; // ignore duplicate
                 _pickedTargets.Add(instance);
                 if (_pickedTargets.Count >= _targetsNeeded)
-                {
                     SubmitPlayCard();
-                }
                 else
-                {
                     RefreshTargetStatus(script.Name);
-                }
             }
             return;
         }
@@ -541,6 +549,7 @@ public partial class BattleController : Node
         _pickedTargets.Clear();
         _targetsNeeded = 1;
         _pickedChoices = null;
+        _pendingTileIndex = null;
         _board.SetStatus("");
         _board.ClearHighlights();
         _board.UnpinDetail();
