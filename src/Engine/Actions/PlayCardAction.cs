@@ -34,8 +34,8 @@ public sealed record PlayCardAction(
         var card = p.Hand.First(c => c.Instance == HandInstance);
         var script = ctx.CardDatabase.Get(card.Card);
 
-        // 强化 X：剩余费用 > X 时，本卡费用强制转为 X，同时打开 IsEnhanced 标志。
-        bool isEnhanced = script.EnhanceCost > 0 && p.Mana > script.EnhanceCost;
+        // 强化 X：剩余费用 ≥ X 时，本卡费用强制转为 X，同时打开 IsEnhanced 标志。
+        bool isEnhanced = script.EnhanceCost > 0 && p.Mana >= script.EnhanceCost;
         int effectiveCost = isEnhanced ? script.EnhanceCost : script.Cost;
 
         if (p.Mana < effectiveCost) throw new InvalidActionException("费用不足");

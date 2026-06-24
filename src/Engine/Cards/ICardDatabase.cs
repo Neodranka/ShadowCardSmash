@@ -35,7 +35,7 @@ public interface ICardScript
     /// <summary>How many of <see cref="Choices"/> the player must select. Default 1.</summary>
     int ChoicesToPick { get; }
     /// <summary>
-    /// 强化 X：玩家剩余费用 &gt; X 时，本卡费用被强制改为 X，并触发 ctx.IsEnhanced 额外效果。
+    /// 强化 X：玩家剩余费用 ≥ X 时，本卡费用被强制改为 X，并触发 ctx.IsEnhanced 额外效果。
     /// 0 表示无强化。
     /// </summary>
     int EnhanceCost { get; }
