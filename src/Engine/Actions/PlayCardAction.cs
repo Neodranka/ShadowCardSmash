@@ -81,8 +81,10 @@ public sealed record PlayCardAction(
             card.CurrentHealth = script.BaseHealth;
             card.MaxHealth = script.BaseHealth;
             card.Keywords = script.InitialKeywords;
+            card.BarrierStacks = script.InitialKeywords.HasFlag(Keyword.Barrier) ? 1 : 0;
             card.Countdown = script.InitialCountdown;
-            card.CanAttackThisTurn = script.InitialKeywords.HasFlag(Keyword.Storm);
+            card.CanAttackThisTurn = script.InitialKeywords.HasFlag(Keyword.Storm)
+                                   || script.InitialKeywords.HasFlag(Keyword.Rush);
             card.SummonedThisTurn = true;
 
             int idx;
@@ -107,6 +109,9 @@ public sealed record PlayCardAction(
             ctx.PickedTarget = ResolvePickedMinion(state);
             ctx.PickedPlayerTarget = TargetPlayer;
             if (!card.IsSilenced) script.OnPlay(ctx);
+
+            // Notify all field cards that a new minion just entered.
+            if (script.CardType == CardType.Minion) EffectPrimitives.NotifyMinionEntered(ctx, card);
         }
     }
 

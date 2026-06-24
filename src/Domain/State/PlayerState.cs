@@ -28,6 +28,9 @@ public sealed class PlayerState
     public List<RuntimeCard> Graveyard = new();
     public List<RuntimeCard> Vanished = new();
 
+    /// <summary>Damage-absorbing stacks on the hero itself (like minion BarrierStacks).</summary>
+    public int BarrierStacks;
+
     public CardId CompensationCard = CardId.None;
 
     public bool MinionDestroyedThisTurn;
@@ -96,6 +99,7 @@ public sealed class PlayerState
             SelfDamageThisTurn = SelfDamageThisTurn,
             TotalSelfDamage = TotalSelfDamage,
             SelfDamageCount = SelfDamageCount,
+            BarrierStacks = BarrierStacks,
         };
         foreach (var c in Deck) copy.Deck.Add(c.Clone());
         foreach (var c in Hand) copy.Hand.Add(c.Clone());

@@ -47,6 +47,10 @@ public sealed record EvolutionPointsGrantedEvent(PlayerSide Side, int Amount) : 
 public sealed record SilenceAppliedEvent(InstanceId Instance) : BoardEvent;
 public sealed record BuffAppliedEvent(InstanceId Instance, int AttackDelta, int HealthDelta) : BoardEvent;
 public sealed record KeywordGainedEvent(InstanceId Instance, Keyword Keyword) : BoardEvent;
+public sealed record BarrierGainedEvent(InstanceId Instance, int Stacks) : BoardEvent;
+public sealed record BarrierLostEvent(InstanceId Instance) : BoardEvent;
+public sealed record PlayerBarrierGainedEvent(PlayerSide Side, int Stacks) : BoardEvent;
+public sealed record PlayerBarrierLostEvent(PlayerSide Side) : BoardEvent;
 
 public sealed record CountdownTickedEvent(InstanceId Instance, int Remaining) : BoardEvent;
 public sealed record AmuletActivatedEvent(InstanceId Instance) : BoardEvent;

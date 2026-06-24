@@ -69,4 +69,10 @@ public sealed class GameContext
     public void AddToHand(PlayerSide side, CardId cardId) => EffectPrimitives.AddToHand(this, side, cardId);
     public void ApplyTileEffect(PlayerSide side, int tileIndex, string key, int value, int duration)
         => EffectPrimitives.ApplyTileEffect(this, side, tileIndex, key, value, duration);
+    public void GiveBarrier(RuntimeCard target, int stacks = 1) => EffectPrimitives.GiveBarrier(this, target, stacks);
+    public void GiveBarrier(PlayerSide side, int stacks = 1) => EffectPrimitives.GiveBarrierToPlayer(this, side, stacks);
+    public InstanceId? DrawSpecificFromDeck(PlayerSide side, System.Func<ICardScript, bool> predicate)
+        => EffectPrimitives.DrawSpecificFromDeck(this, side, predicate);
+    public int SummonUniqueFromDeck(PlayerSide side, System.Func<ICardScript, bool> predicate)
+        => EffectPrimitives.SummonUniqueFromDeck(this, side, predicate);
 }

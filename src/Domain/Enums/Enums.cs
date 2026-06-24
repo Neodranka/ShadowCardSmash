@@ -20,7 +20,7 @@ public enum HeroClass
 {
     Neutral = 0,
     Vampire = 1,
-    ClassB = 2,
+    Empire = 2,
     ClassC = 3,
     ClassD = 4,
     ClassE = 5,

@@ -26,6 +26,9 @@ public sealed class RuntimeCard
 
     public bool SummonedThisTurn;
 
+    /// <summary>If true, the OnDeath hook is skipped (used by spawned copies that "lose 谢幕").</summary>
+    public bool OnDeathSuppressed;
+
     public RuntimeCard Clone()
     {
         var copy = new RuntimeCard
@@ -45,6 +48,7 @@ public sealed class RuntimeCard
             Keywords = Keywords,
             BarrierStacks = BarrierStacks,
             SummonedThisTurn = SummonedThisTurn,
+            OnDeathSuppressed = OnDeathSuppressed,
         };
         foreach (var buff in Buffs) copy.Buffs.Add(buff.Clone());
         return copy;

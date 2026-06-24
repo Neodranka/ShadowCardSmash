@@ -58,4 +58,8 @@ public abstract class CardScript : ICardScript
     public virtual void OnEvolve(GameContext ctx) { }
     public virtual void OnActivate(GameContext ctx) { }
     public virtual void OnCountdownReachZero(GameContext ctx) { }
+
+    public virtual void OnSelfBarrierLost(GameContext ctx) { }
+    public virtual void OnFieldMinionEntered(GameContext ctx, RuntimeCard newcomer) { }
+    public virtual void OnFieldMinionBarrierLost(GameContext ctx, RuntimeCard target) { }
 }

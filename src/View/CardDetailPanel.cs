@@ -138,7 +138,7 @@ public partial class CardDetailPanel : PanelContainer
         {
             HeroClass.Neutral => "中立",
             HeroClass.Vampire => "吸血鬼",
-            HeroClass.ClassB => "职业B",
+            HeroClass.Empire => "帝国",
             HeroClass.ClassC => "职业C",
             _ => "",
         };

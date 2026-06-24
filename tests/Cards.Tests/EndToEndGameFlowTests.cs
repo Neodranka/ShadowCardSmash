@@ -161,7 +161,7 @@ public class EndToEndGameFlowTests
     public void DeckValidator_RejectsViolations()
     {
         // Wrong class: Vampire card in a non-Vampire deck.
-        var wrongClass = DeckValidator.Validate(BuildDeck(new CardId(2001)), HeroClass.ClassB, Registry);
+        var wrongClass = DeckValidator.Validate(BuildDeck(new CardId(2001)), HeroClass.Empire, Registry);
         Assert.False(wrongClass.IsValid);
 
         // Wrong size: only 3 cards.

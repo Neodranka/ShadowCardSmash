@@ -47,4 +47,11 @@ public interface ICardScript
     void OnEvolve(GameContext ctx);
     void OnActivate(GameContext ctx);
     void OnCountdownReachZero(GameContext ctx);
+
+    /// <summary>Fired on the target card when its own barrier stack drops to 0.</summary>
+    void OnSelfBarrierLost(GameContext ctx);
+    /// <summary>Fired on every field card whenever any minion is placed on the field. Includes the newcomer.</summary>
+    void OnFieldMinionEntered(GameContext ctx, RuntimeCard newcomer);
+    /// <summary>Fired on every field card OTHER than the target when a minion loses its last barrier stack.</summary>
+    void OnFieldMinionBarrierLost(GameContext ctx, RuntimeCard target);
 }

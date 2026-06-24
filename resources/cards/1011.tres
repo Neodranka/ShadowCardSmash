@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CardDataResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Cards/Resources/CardDataResource.cs" id="1_card"]
+
+[resource]
+script = ExtResource("1_card")
+Name = "护盾术"
+Description = "选择一个友方随从，为其添加屏障(强化4)；使我方玩家也获得屏障。"
+Cost = 2
+BaseAttack = 0
+BaseHealth = 0
+EvolvedAttack = 0
+EvolvedHealth = 0
+CardTypeEnum = 1
+HeroClassEnum = 0
+RarityEnum = 1
+TagsArray = PackedStringArray("魔法")
+InitialKeywordsFlags = 0
+InitialCountdownValue = -1
+ArtPath = ""

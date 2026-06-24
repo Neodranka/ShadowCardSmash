@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CardDataResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Cards/Resources/CardDataResource.cs" id="1_card"]
+
+[resource]
+script = ExtResource("1_card")
+Name = "布伦哈尔家族骑士"
+Description = "突进。守护。谢幕：召唤一个「布伦哈尔家族骑士」，使其获得屏障并失去谢幕。"
+Cost = 5
+BaseAttack = 3
+BaseHealth = 2
+EvolvedAttack = 5
+EvolvedHealth = 4
+CardTypeEnum = 0
+HeroClassEnum = 2
+RarityEnum = 1
+TagsArray = PackedStringArray("人类", "士兵", "布伦哈尔", "骑士")
+InitialKeywordsFlags = 3
+InitialCountdownValue = -1
+ArtPath = ""

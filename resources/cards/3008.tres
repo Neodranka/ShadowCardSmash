@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CardDataResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Cards/Resources/CardDataResource.cs" id="1_card"]
+
+[resource]
+script = ExtResource("1_card")
+Name = "布伦哈尔老兵"
+Description = "在你的回合结束时，获得屏障。"
+Cost = 4
+BaseAttack = 4
+BaseHealth = 3
+EvolvedAttack = 6
+EvolvedHealth = 5
+CardTypeEnum = 0
+HeroClassEnum = 2
+RarityEnum = 1
+TagsArray = PackedStringArray("人类", "士兵", "布伦哈尔")
+InitialKeywordsFlags = 0
+InitialCountdownValue = -1
+ArtPath = ""

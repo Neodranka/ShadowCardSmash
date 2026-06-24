@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CardDataResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Cards/Resources/CardDataResource.cs" id="1_card"]
+
+[resource]
+script = ExtResource("1_card")
+Name = "决斗"
+Description = "选择两个随从。若同方：互相获得等同于对方攻击力的攻击力；否则：互相造成等同于对方攻击力的伤害。"
+Cost = 5
+BaseAttack = 0
+BaseHealth = 0
+EvolvedAttack = 0
+EvolvedHealth = 0
+CardTypeEnum = 1
+HeroClassEnum = 2
+RarityEnum = 2
+TagsArray = PackedStringArray("骑士", "仪式")
+InitialKeywordsFlags = 0
+InitialCountdownValue = -1
+ArtPath = ""

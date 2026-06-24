@@ -183,7 +183,7 @@ public partial class CardView : PanelContainer
         {
             HeroClass.Vampire => new Color(0.85f, 0.25f, 0.35f),
             HeroClass.Neutral => new Color(0.55f, 0.55f, 0.65f),
-            HeroClass.ClassB => new Color(0.3f, 0.7f, 0.95f),
+            HeroClass.Empire => new Color(0.85f, 0.75f, 0.35f),
             HeroClass.ClassC => new Color(0.35f, 0.85f, 0.45f),
             _ => new Color(0.6f, 0.5f, 0.8f),
         };

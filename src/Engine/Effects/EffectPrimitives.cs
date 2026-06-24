@@ -19,6 +19,15 @@ public static class EffectPrimitives
         {
             target.BarrierStacks--;
             ctx.Loop.Publish(new MinionDamagedEvent(target.Instance, 0, ctx.Source?.Instance), ctx);
+            if (target.BarrierStacks == 0)
+            {
+                ctx.Loop.Publish(new BarrierLostEvent(target.Instance), ctx);
+                // Self-hook on the minion that just lost its last barrier.
+                var targetScript = ctx.CardDatabase.Get(target.Card);
+                if (!target.IsSilenced) targetScript.OnSelfBarrierLost(ctx.WithSource(target));
+                // Other field cards observe the loss.
+                DispatchAllyMinionBarrierLost(ctx, target);
+            }
             return false;
         }
 
@@ -41,6 +50,15 @@ public static class EffectPrimitives
     {
         if (amount <= 0) return;
         var p = ctx.State.GetPlayer(target);
+        // Player barrier absorbs one whole damage instance.
+        if (p.BarrierStacks > 0)
+        {
+            p.BarrierStacks--;
+            ctx.Loop.Publish(new PlayerDamagedEvent(target, 0, ctx.Source?.Instance), ctx);
+            if (p.BarrierStacks == 0)
+                ctx.Loop.Publish(new PlayerBarrierLostEvent(target), ctx);
+            return;
+        }
         p.Health -= amount;
         ctx.Loop.Publish(new PlayerDamagedEvent(target, amount, ctx.Source?.Instance), ctx);
         ctx.Loop.CheckGameEnd();
@@ -156,8 +174,10 @@ public static class EffectPrimitives
             CurrentHealth = script.BaseHealth,
             MaxHealth = script.BaseHealth,
             Keywords = script.InitialKeywords,
+            BarrierStacks = script.InitialKeywords.HasFlag(Keyword.Barrier) ? 1 : 0,
             Countdown = script.InitialCountdown,
-            CanAttackThisTurn = script.InitialKeywords.HasFlag(Keyword.Storm),
+            CanAttackThisTurn = script.InitialKeywords.HasFlag(Keyword.Storm)
+                              || script.InitialKeywords.HasFlag(Keyword.Rush),
             SummonedThisTurn = true,
         };
         p.Field[idx].Occupant = card;
@@ -166,6 +186,8 @@ public static class EffectPrimitives
             ctx.Loop.Publish(new AmuletPlacedEvent(side, card.Instance, cardId, idx), ctx);
         else
             ctx.Loop.Publish(new MinionSummonedEvent(side, card.Instance, cardId, idx), ctx);
+
+        if (script.CardType == CardType.Minion) NotifyMinionEntered(ctx, card);
 
         return card.Instance;
     }
@@ -238,8 +260,8 @@ public static class EffectPrimitives
         else
             ctx.Loop.Publish(new MinionDestroyedEvent(target.Instance, target.Card, target.Owner, tileIdx), ctx);
 
-        // Run death hook unless silenced (silence removes onDeath/onDeath-like effects).
-        if (!target.IsSilenced) script.OnDeath(ctx.WithSource(target));
+        // Run death hook unless silenced or explicitly suppressed (spawned copies).
+        if (!target.IsSilenced && !target.OnDeathSuppressed) script.OnDeath(ctx.WithSource(target));
     }
 
     public static void Vanish(GameContext ctx, RuntimeCard target)
@@ -303,5 +325,112 @@ public static class EffectPrimitives
             Source = ctx.Source?.Instance ?? InstanceId.None,
         });
         ctx.Loop.Publish(new TileEffectAppliedEvent(side, tileIndex, key, duration), ctx);
+    }
+
+    // ===== Barrier =====
+
+    public static void GiveBarrier(GameContext ctx, RuntimeCard target, int stacks = 1)
+    {
+        if (stacks <= 0 || target.Zone != Zone.Field) return;
+        target.BarrierStacks += stacks;
+        target.AddKeyword(Keyword.Barrier);
+        ctx.Loop.Publish(new BarrierGainedEvent(target.Instance, stacks), ctx);
+    }
+
+    public static void GiveBarrierToPlayer(GameContext ctx, PlayerSide side, int stacks = 1)
+    {
+        if (stacks <= 0) return;
+        var p = ctx.State.GetPlayer(side);
+        p.BarrierStacks += stacks;
+        ctx.Loop.Publish(new PlayerBarrierGainedEvent(side, stacks), ctx);
+    }
+
+    // ===== Search / structured draw =====
+
+    /// <summary>Move the first deck card matching <paramref name="predicate"/> to hand. Returns its instance, or null.</summary>
+    public static InstanceId? DrawSpecificFromDeck(GameContext ctx, PlayerSide side,
+        System.Func<ICardScript, bool> predicate)
+    {
+        var p = ctx.State.GetPlayer(side);
+        for (int i = p.Deck.Count - 1; i >= 0; i--)
+        {
+            var card = p.Deck[i];
+            if (!predicate(ctx.CardDatabase.Get(card.Card))) continue;
+            p.Deck.RemoveAt(i);
+            if (p.Hand.Count >= PlayerState.HandLimit)
+            {
+                card.Zone = Zone.Graveyard;
+                p.Graveyard.Add(card);
+                ctx.Loop.Publish(new CardOverdrawnEvent(side, card.Instance, card.Card), ctx);
+            }
+            else
+            {
+                card.Zone = Zone.Hand;
+                p.Hand.Add(card);
+                ctx.Loop.Publish(new CardDrawnEvent(side, card.Instance, card.Card), ctx);
+            }
+            return card.Instance;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Iterate the owner's deck, pick at most one card per unique CardId matching the predicate, and Summon each
+    /// onto the field until tiles run out. Used by 拉多万's OnPlay (unique-named 布伦哈尔 minions).
+    /// </summary>
+    public static int SummonUniqueFromDeck(GameContext ctx, PlayerSide side, System.Func<ICardScript, bool> predicate)
+    {
+        var p = ctx.State.GetPlayer(side);
+        var seen = new HashSet<CardId>();
+        var candidates = new List<RuntimeCard>();
+        foreach (var card in p.Deck)
+        {
+            if (seen.Contains(card.Card)) continue;
+            var script = ctx.CardDatabase.Get(card.Card);
+            if (script.CardType != CardType.Minion) continue;
+            if (!predicate(script)) continue;
+            seen.Add(card.Card);
+            candidates.Add(card);
+        }
+        int summoned = 0;
+        foreach (var card in candidates)
+        {
+            if (!p.TryGetEmptyTileIndex(out _)) break;
+            p.Deck.Remove(card);
+            if (Summon(ctx, card.Card, side) is not null) summoned++;
+        }
+        return summoned;
+    }
+
+    // ===== Dispatch helpers =====
+
+    /// <summary>Iterate ALL field minions on both sides and fire OnFieldMinionEntered on their scripts.</summary>
+    public static void NotifyMinionEntered(GameContext ctx, RuntimeCard newcomer)
+    {
+        for (int s = 0; s < 2; s++)
+        {
+            foreach (var tile in ctx.State.Players[s].Field)
+            {
+                if (tile.Occupant is not { } m) continue;
+                if (m.IsSilenced) continue;
+                var script = ctx.CardDatabase.Get(m.Card);
+                script.OnFieldMinionEntered(ctx.WithSource(m), newcomer);
+            }
+        }
+    }
+
+    private static void DispatchAllyMinionBarrierLost(GameContext ctx, RuntimeCard target)
+    {
+        for (int s = 0; s < 2; s++)
+        {
+            foreach (var tile in ctx.State.Players[s].Field)
+            {
+                if (tile.Occupant is not { } m) continue;
+                if (m.Instance == target.Instance) continue;
+                if (m.IsSilenced) continue;
+                var script = ctx.CardDatabase.Get(m.Card);
+                script.OnFieldMinionBarrierLost(ctx.WithSource(m), target);
+            }
+        }
     }
 }

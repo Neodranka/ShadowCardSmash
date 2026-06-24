@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CardDataResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Cards/Resources/CardDataResource.cs" id="1_card"]
+
+[resource]
+script = ExtResource("1_card")
+Name = "布伦哈尔家徽"
+Description = "抉择：1) 抽一张「布伦哈尔」随从； 2) 选择一个友方「布伦哈尔」随从为其添加屏障。"
+Cost = 2
+BaseAttack = 0
+BaseHealth = 0
+EvolvedAttack = 0
+EvolvedHealth = 0
+CardTypeEnum = 1
+HeroClassEnum = 2
+RarityEnum = 2
+TagsArray = PackedStringArray()
+InitialKeywordsFlags = 0
+InitialCountdownValue = -1
+ArtPath = ""
