@@ -54,7 +54,7 @@ public partial class MainMenuController : Control
 
     private void OnHotSeat()
     {
-        GetTree().ChangeSceneToFile("res://scenes/Battle.tscn");
+        GetTree().ChangeSceneToFile("res://scenes/DeckSelection.tscn");
     }
 
     private void OnDeckBuilder()

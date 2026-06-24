@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="DeckResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Cards/Resources/DeckResource.cs" id="1_deck"]
+
+[resource]
+script = ExtResource("1_deck")
+DeckName = "弃绝者起始套牌"
+HeroClassEnum = 1
+; 2 Forsaken × 3 = 6 + 4 中立 × 3 = 12 → 18 张（卡池不够，开局会比较快进入疲劳）
+CardIds = PackedInt32Array(2001, 2001, 2001, 2004, 2004, 2004, 1001, 1001, 1001, 1010, 1010, 1010, 1011, 1011, 1011)
+CompensationCardId = 0
+LastModifiedTicks = 0

@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Threading.Tasks;
 using Godot;
+using ShadowCardSmash.App;
 using ShadowCardSmash.Cards;
 using ShadowCardSmash.Cards.Resources;
 using ShadowCardSmash.Domain;
@@ -59,19 +60,34 @@ public partial class BattleController : Node
         StartHotSeatGame();
     }
 
+    private (IReadOnlyList<CardId> Cards, HeroClass HeroClass) ResolveSeat(DeckResource? deck, HeroClass fallbackClass)
+    {
+        if (deck is not null && deck.CardIds.Length > 0)
+        {
+            var list = new List<CardId>(deck.CardIds.Length);
+            foreach (var id in deck.CardIds) list.Add(new CardId(id));
+            return (list, deck.HeroClassEnum);
+        }
+        // Fallback (no deck selected — should not happen via DeckSelection flow, but covers F5-on-Battle dev case).
+        var demo = new List<CardId>();
+        for (int i = 0; i < 20; i++) demo.Add(new CardId(2001));
+        for (int i = 0; i < 20; i++) demo.Add(new CardId(1001));
+        return (demo, fallbackClass);
+    }
+
     private void StartHotSeatGame()
     {
         var state = new GameState();
-        var rng = new DeterministicRng(seed: (int)Time.GetTicksMsec(), counter: 0);
+        int seed = BattleSetup.Seed != 0 ? BattleSetup.Seed : (int)Time.GetTicksMsec();
+        var rng = new DeterministicRng(seed, counter: 0);
         _loop = new GameLoop(state, _registry, rng);
 
-        var deck = new List<CardId>();
-        for (int i = 0; i < 20; i++) deck.Add(new CardId(2001));
-        for (int i = 0; i < 20; i++) deck.Add(new CardId(1001));
+        var (p1List, p1Class) = ResolveSeat(BattleSetup.Player1Deck, fallbackClass: HeroClass.Forsaken);
+        var (p2List, p2Class) = ResolveSeat(BattleSetup.Player2Deck, fallbackClass: HeroClass.Forsaken);
 
-        var first = new GameInitializer.SeatConfig(deck, HeroClass.Forsaken, null);
-        var second = new GameInitializer.SeatConfig(deck, HeroClass.Forsaken, null);
-        GameInitializer.Begin(_loop, seed: state.RandomSeed, first, second);
+        var first = new GameInitializer.SeatConfig(p1List, p1Class, null);
+        var second = new GameInitializer.SeatConfig(p2List, p2Class, null);
+        GameInitializer.Begin(_loop, seed: seed, first, second);
 
         _loop.Submit(new MulliganAction(PlayerSide.First, System.Array.Empty<int>()));
         _loop.Submit(new MulliganAction(PlayerSide.Second, System.Array.Empty<int>()));

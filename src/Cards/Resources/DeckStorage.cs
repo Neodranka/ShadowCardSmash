@@ -10,6 +10,35 @@ public static class DeckStorage
 {
     public const string DeckDir = "user://decks/";
 
+    /// <summary>Built-in starter decks shipped with the game (res://). Always shown in the picker.</summary>
+    public static readonly string[] BuiltInDeckPaths =
+    {
+        "res://resources/decks/forsaken_starter.tres",
+        "res://resources/decks/empire_starter.tres",
+    };
+
+    public readonly record struct DeckEntry(string DisplayName, string SourcePath, bool IsBuiltIn, DeckResource Resource);
+
+    /// <summary>Enumerate both shipped + user-saved decks. Built-in decks first.</summary>
+    public static List<DeckEntry> ListAllDecks()
+    {
+        var result = new List<DeckEntry>();
+        foreach (var p in BuiltInDeckPaths)
+        {
+            if (!ResourceLoader.Exists(p)) continue;
+            var res = GD.Load<DeckResource>(p);
+            if (res is null) continue;
+            result.Add(new DeckEntry(res.DeckName + " (预制)", p, true, res));
+        }
+        foreach (var name in ListDeckNames())
+        {
+            var res = Load(name);
+            if (res is null) continue;
+            result.Add(new DeckEntry(res.DeckName, MakePath(name), false, res));
+        }
+        return result;
+    }
+
     public static void EnsureDir()
     {
         if (!DirAccess.DirExistsAbsolute(DeckDir))
