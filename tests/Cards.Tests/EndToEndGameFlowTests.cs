@@ -1,6 +1,6 @@
 using System.Reflection;
 using ShadowCardSmash.Cards;
-using ShadowCardSmash.Cards.Vampire;
+using ShadowCardSmash.Cards.Forsaken;
 using ShadowCardSmash.Domain;
 using ShadowCardSmash.Engine;
 using Xunit;
@@ -38,7 +38,7 @@ public class EndToEndGameFlowTests
     public void GameInitializer_SeedsBothPlayersWithStartingHands()
     {
         var (loop, state) = NewGame();
-        var first = new GameInitializer.SeatConfig(BuildDeck(new CardId(2001)), HeroClass.Vampire, null);
+        var first = new GameInitializer.SeatConfig(BuildDeck(new CardId(2001)), HeroClass.Forsaken, null);
         var second = new GameInitializer.SeatConfig(BuildDeck(new CardId(1001)), HeroClass.Neutral, null);
 
         GameInitializer.Begin(loop, seed: 7, first, second);
@@ -55,7 +55,7 @@ public class EndToEndGameFlowTests
         var (loop, state) = NewGame();
         GameInitializer.Begin(loop,
             seed: 7,
-            new GameInitializer.SeatConfig(BuildDeck(new CardId(2001)), HeroClass.Vampire, null),
+            new GameInitializer.SeatConfig(BuildDeck(new CardId(2001)), HeroClass.Forsaken, null),
             new GameInitializer.SeatConfig(BuildDeck(new CardId(1001)), HeroClass.Neutral, null));
 
         loop.Submit(new MulliganAction(PlayerSide.First, Array.Empty<int>()));
@@ -75,7 +75,7 @@ public class EndToEndGameFlowTests
         var (loop, state) = NewGame();
         GameInitializer.Begin(loop,
             seed: 7,
-            new GameInitializer.SeatConfig(BuildDeck(new CardId(2001)), HeroClass.Vampire, null),
+            new GameInitializer.SeatConfig(BuildDeck(new CardId(2001)), HeroClass.Forsaken, null),
             new GameInitializer.SeatConfig(BuildDeck(new CardId(1001)), HeroClass.Neutral, null));
         loop.Submit(new MulliganAction(PlayerSide.First, Array.Empty<int>()));
         loop.Submit(new MulliganAction(PlayerSide.Second, Array.Empty<int>()));
@@ -101,7 +101,7 @@ public class EndToEndGameFlowTests
         var (loop, state) = NewGame();
         GameInitializer.Begin(loop,
             seed: 7,
-            new GameInitializer.SeatConfig(BuildDeck(new CardId(2001)), HeroClass.Vampire, null),
+            new GameInitializer.SeatConfig(BuildDeck(new CardId(2001)), HeroClass.Forsaken, null),
             new GameInitializer.SeatConfig(BuildDeck(new CardId(1001)), HeroClass.Neutral, null));
         loop.Submit(new MulliganAction(PlayerSide.First, Array.Empty<int>()));
         loop.Submit(new MulliganAction(PlayerSide.Second, Array.Empty<int>()));
@@ -119,7 +119,7 @@ public class EndToEndGameFlowTests
         var (loop, state) = NewGame();
         GameInitializer.Begin(loop,
             seed: 7,
-            new GameInitializer.SeatConfig(BuildDeck(new CardId(2001)), HeroClass.Vampire, null),
+            new GameInitializer.SeatConfig(BuildDeck(new CardId(2001)), HeroClass.Forsaken, null),
             new GameInitializer.SeatConfig(BuildDeck(new CardId(1001)), HeroClass.Neutral, null));
         loop.Submit(new MulliganAction(PlayerSide.First, Array.Empty<int>()));
         loop.Submit(new MulliganAction(PlayerSide.Second, Array.Empty<int>()));
@@ -160,17 +160,17 @@ public class EndToEndGameFlowTests
     [Fact]
     public void DeckValidator_RejectsViolations()
     {
-        // Wrong class: Vampire card in a non-Vampire deck.
+        // Wrong class: Forsaken card in a non-Forsaken deck.
         var wrongClass = DeckValidator.Validate(BuildDeck(new CardId(2001)), HeroClass.Empire, Registry);
         Assert.False(wrongClass.IsValid);
 
         // Wrong size: only 3 cards.
         var tooSmall = DeckValidator.Validate(
-            new List<CardId> { new(2001), new(2001), new(2001) }, HeroClass.Vampire, Registry);
+            new List<CardId> { new(2001), new(2001), new(2001) }, HeroClass.Forsaken, Registry);
         Assert.False(tooSmall.IsValid);
 
         // Same-card limit: 40 copies of one card violates the 3-copy maximum.
-        var tooManyCopies = DeckValidator.Validate(BuildDeck(new CardId(2001)), HeroClass.Vampire, Registry);
+        var tooManyCopies = DeckValidator.Validate(BuildDeck(new CardId(2001)), HeroClass.Forsaken, Registry);
         Assert.False(tooManyCopies.IsValid);
         Assert.Contains("Too many copies", tooManyCopies.Reason);
     }

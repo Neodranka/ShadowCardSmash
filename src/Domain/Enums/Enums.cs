@@ -19,7 +19,7 @@ public enum Rarity
 public enum HeroClass
 {
     Neutral = 0,
-    Vampire = 1,
+    Forsaken = 1,
     Empire = 2,
     ClassC = 3,
     ClassD = 4,

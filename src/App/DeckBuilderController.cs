@@ -17,7 +17,7 @@ public partial class DeckBuilderController : Control
 {
     private CardRegistry _registry = null!;
     private readonly Dictionary<CardId, int> _deckCounts = new();
-    private HeroClass _selectedClass = HeroClass.Vampire;
+    private HeroClass _selectedClass = HeroClass.Forsaken;
     private string? _loadedDeckName;
 
     private LineEdit _nameInput = null!;

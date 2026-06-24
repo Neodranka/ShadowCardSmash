@@ -1,7 +1,7 @@
 using ShadowCardSmash.Domain;
 using ShadowCardSmash.Engine;
 
-namespace ShadowCardSmash.Cards.Vampire;
+namespace ShadowCardSmash.Cards.Forsaken;
 
 /// <summary>
 /// 撕咬 — 1费法术 铜
@@ -13,7 +13,7 @@ public sealed class Bite : SpellCard
     public override string Name => "撕咬";
     public override string Description => "对一个敌方随从造成2点伤害，恢复2点我方生命值。";
     public override int Cost => 1;
-    public override HeroClass HeroClass => HeroClass.Vampire;
+    public override HeroClass HeroClass => HeroClass.Forsaken;
     public override Rarity Rarity => Rarity.Bronze;
     public override IReadOnlyList<string> Tags => new[] { "魔法" };
     public override TargetSpec PlayTarget => TargetSpec.SingleEnemyMinion;

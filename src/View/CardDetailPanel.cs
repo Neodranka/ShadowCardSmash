@@ -137,7 +137,7 @@ public partial class CardDetailPanel : PanelContainer
         string heroClass = s.HeroClass switch
         {
             HeroClass.Neutral => "中立",
-            HeroClass.Vampire => "吸血鬼",
+            HeroClass.Forsaken => "弃绝者",
             HeroClass.Empire => "帝国",
             HeroClass.ClassC => "职业C",
             _ => "",

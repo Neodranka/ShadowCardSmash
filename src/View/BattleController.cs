@@ -69,8 +69,8 @@ public partial class BattleController : Node
         for (int i = 0; i < 20; i++) deck.Add(new CardId(2001));
         for (int i = 0; i < 20; i++) deck.Add(new CardId(1001));
 
-        var first = new GameInitializer.SeatConfig(deck, HeroClass.Vampire, null);
-        var second = new GameInitializer.SeatConfig(deck, HeroClass.Vampire, null);
+        var first = new GameInitializer.SeatConfig(deck, HeroClass.Forsaken, null);
+        var second = new GameInitializer.SeatConfig(deck, HeroClass.Forsaken, null);
         GameInitializer.Begin(_loop, seed: state.RandomSeed, first, second);
 
         _loop.Submit(new MulliganAction(PlayerSide.First, System.Array.Empty<int>()));

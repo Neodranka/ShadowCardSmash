@@ -1,7 +1,7 @@
 using ShadowCardSmash.Domain;
 using ShadowCardSmash.Engine;
 
-namespace ShadowCardSmash.Cards.Vampire;
+namespace ShadowCardSmash.Cards.Forsaken;
 
 /// <summary>
 /// 卖血者 — 1费 1/1 铜
@@ -13,7 +13,7 @@ public sealed class BloodSeller : MinionCard
     public override string Name => "卖血者";
     public override string Description => "开幕：对我方造成2点伤害，抽1张牌。";
     public override int Cost => 1;
-    public override HeroClass HeroClass => HeroClass.Vampire;
+    public override HeroClass HeroClass => HeroClass.Forsaken;
     public override Rarity Rarity => Rarity.Bronze;
     public override IReadOnlyList<string> Tags => new[] { "人类" };
 

@@ -65,7 +65,7 @@ public static class EffectPrimitives
     }
 
     /// <summary>
-    /// Vampire signature: damage to your own hero. Tracks counters for synergy conditions.
+    /// Forsaken signature: damage to your own hero. Tracks counters for synergy conditions.
     /// </summary>
     public static void SelfDamagePlayer(GameContext ctx, PlayerSide target, int amount)
     {

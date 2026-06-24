@@ -181,7 +181,7 @@ public partial class CardView : PanelContainer
     {
         var baseBorder = script.HeroClass switch
         {
-            HeroClass.Vampire => new Color(0.85f, 0.25f, 0.35f),
+            HeroClass.Forsaken => new Color(0.85f, 0.25f, 0.35f),
             HeroClass.Neutral => new Color(0.55f, 0.55f, 0.65f),
             HeroClass.Empire => new Color(0.85f, 0.75f, 0.35f),
             HeroClass.ClassC => new Color(0.35f, 0.85f, 0.45f),
