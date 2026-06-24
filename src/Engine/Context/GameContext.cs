@@ -27,6 +27,8 @@ public sealed class GameContext
     public IReadOnlyList<RuntimeCard> PickedTargets { get; internal set; } = System.Array.Empty<RuntimeCard>();
     /// <summary>Indices the player chose from CardScript.Choices.</summary>
     public IReadOnlyList<int> PickedChoices { get; internal set; } = System.Array.Empty<int>();
+    /// <summary>True when this card's 强化 X condition was met → OnPlay should run the extra effect.</summary>
+    public bool IsEnhanced { get; internal set; }
 
     public GameContext(GameState state, IRng rng, GameLoop loop, ICardDatabase cardDb, PlayerSide sourceSide)
     {
@@ -52,6 +54,7 @@ public sealed class GameContext
         PickedTileIndex = PickedTileIndex,
         PickedTargets = PickedTargets,
         PickedChoices = PickedChoices,
+        IsEnhanced = IsEnhanced,
     };
 
     // === Effect primitives (facade) ===

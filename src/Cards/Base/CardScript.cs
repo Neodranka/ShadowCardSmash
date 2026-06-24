@@ -36,6 +36,7 @@ public abstract class CardScript : ICardScript
     public virtual int TargetsToPick => 1;
     public virtual IReadOnlyList<CardChoice> Choices => Array.Empty<CardChoice>();
     public virtual int ChoicesToPick => 1;
+    public virtual int EnhanceCost => 0;
 
     public virtual int BaseAttack => Data?.BaseAttack ?? 0;
     public virtual int BaseHealth => Data?.BaseHealth ?? 0;

@@ -34,7 +34,11 @@ public sealed record PlayCardAction(
         var card = p.Hand.First(c => c.Instance == HandInstance);
         var script = ctx.CardDatabase.Get(card.Card);
 
-        if (p.Mana < script.Cost) throw new InvalidActionException("费用不足");
+        // 强化 X：剩余费用 > X 时，本卡费用强制转为 X，同时打开 IsEnhanced 标志。
+        bool isEnhanced = script.EnhanceCost > 0 && p.Mana > script.EnhanceCost;
+        int effectiveCost = isEnhanced ? script.EnhanceCost : script.Cost;
+
+        if (p.Mana < effectiveCost) throw new InvalidActionException("费用不足");
 
         // Type-specific placement / target gating.
         switch (script.CardType)
@@ -56,8 +60,9 @@ public sealed record PlayCardAction(
         }
 
         // Consume mana, remove from hand.
-        p.Mana -= script.Cost;
+        p.Mana -= effectiveCost;
         p.Hand.Remove(card);
+        ctx.IsEnhanced = isEnhanced;
         ctx.Loop.Publish(new ManaChangedEvent(Issuer, p.Mana, p.MaxMana), ctx);
         ctx.Loop.Publish(new CardPlayedEvent(Issuer, card.Instance, card.Card), ctx);
 

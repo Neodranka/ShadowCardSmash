@@ -353,20 +353,23 @@ public partial class BattleController : Node
 
         IReadOnlyList<RuntimeCard> cards;
         string title;
-        if (kind == PileView.Kind.Deck)
+        switch (kind)
         {
-            // Cost ascending, then card id, so the view is stable across re-openings.
-            cards = p.Deck
-                .OrderBy(c => _registry.Get(c.Card).Cost)
-                .ThenBy(c => c.Card.Value)
-                .ToArray();
-            title = side == LocalSide ? $"我方牌库（{p.Deck.Count}）" : $"对方牌库（{p.Deck.Count}）";
-        }
-        else
-        {
-            // Graveyard preserves insertion order — newest at the end.
-            cards = p.Graveyard.ToArray();
-            title = side == LocalSide ? $"我方墓地（{p.Graveyard.Count}）" : $"对方墓地（{p.Graveyard.Count}）";
+            case PileView.Kind.Deck:
+                cards = p.Deck
+                    .OrderBy(c => _registry.Get(c.Card).Cost)
+                    .ThenBy(c => c.Card.Value)
+                    .ToArray();
+                title = side == LocalSide ? $"我方牌库（{p.Deck.Count}）" : $"对方牌库（{p.Deck.Count}）";
+                break;
+            case PileView.Kind.Banish:
+                cards = p.Vanished.ToArray();
+                title = side == LocalSide ? $"我方放逐区（{p.Vanished.Count}）" : $"对方放逐区（{p.Vanished.Count}）";
+                break;
+            default: // Graveyard
+                cards = p.Graveyard.ToArray();
+                title = side == LocalSide ? $"我方墓地（{p.Graveyard.Count}）" : $"对方墓地（{p.Graveyard.Count}）";
+                break;
         }
 
         var popup = new PilePopup();

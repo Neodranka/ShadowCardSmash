@@ -13,7 +13,7 @@ public partial class PileView : PanelContainer
     public const int SlotWidth = TileSlotView.Width;
     public const int SlotHeight = TileSlotView.Height / 2 - 2; // two pile slots = one tile-row height
 
-    public enum Kind { Deck, Graveyard, Placeholder }
+    public enum Kind { Deck, Graveyard, Placeholder, Banish }
 
     [Signal] public delegate void ClickedEventHandler(int sideIndex, int kindIndex);
 
@@ -103,6 +103,18 @@ public partial class PileView : PanelContainer
         _sb.BgColor = new Color(0.08f, 0.08f, 0.1f);
         _sb.BorderColor = new Color(0.25f, 0.25f, 0.3f);
         TooltipText = "";
+    }
+
+    public void BindBanish(int count)
+    {
+        BuildUi();
+        PileKind = Kind.Banish;
+        _title.Text = "放逐";
+        _count.Text = count.ToString();
+        _count.Visible = true;
+        _sb.BgColor = new Color(0.16f, 0.08f, 0.10f);
+        _sb.BorderColor = new Color(0.75f, 0.45f, 0.45f);
+        TooltipText = $"放逐区（{count} 张） — 点击查看";
     }
 
     private void OnGuiInput(InputEvent e)

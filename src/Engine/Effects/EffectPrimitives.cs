@@ -19,14 +19,15 @@ public static class EffectPrimitives
         if (target.BarrierStacks > 0)
         {
             target.BarrierStacks--;
+            // 伤害事件照常触发（amount=0），让"受到伤害"型效果（如反击、抽牌）依然能响应屏障吸收。
             ctx.Loop.Publish(new MinionDamagedEvent(target.Instance, 0, ctx.Source?.Instance), ctx);
+            var targetScript = ctx.CardDatabase.Get(target.Card);
+            if (!target.IsSilenced) targetScript.OnDamaged(ctx.WithSource(target), 0, ctx.Source?.Instance);
+
             if (target.BarrierStacks == 0)
             {
                 ctx.Loop.Publish(new BarrierLostEvent(target.Instance), ctx);
-                // Self-hook on the minion that just lost its last barrier.
-                var targetScript = ctx.CardDatabase.Get(target.Card);
                 if (!target.IsSilenced) targetScript.OnSelfBarrierLost(ctx.WithSource(target));
-                // Other field cards observe the loss.
                 DispatchAllyMinionBarrierLost(ctx, target);
             }
             return false;
@@ -161,7 +162,20 @@ public static class EffectPrimitives
         }
         else
         {
-            if (!p.TryGetEmptyTileIndex(out idx)) return null;
+            if (!p.TryGetEmptyTileIndex(out idx))
+            {
+                // 召唤定义：空间不足时无法被召唤的卡牌直接消失（进入放逐区）。
+                var ghost = new RuntimeCard
+                {
+                    Instance = ctx.State.AllocateInstanceId(),
+                    Card = cardId,
+                    Owner = side,
+                    Zone = Zone.Vanished,
+                };
+                p.Vanished.Add(ghost);
+                ctx.Loop.Publish(new MinionVanishedEvent(ghost.Instance, cardId, side), ctx);
+                return null;
+            }
         }
 
         var script = ctx.CardDatabase.Get(cardId);

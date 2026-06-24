@@ -285,12 +285,12 @@ public partial class BoardView : Control
 
         MyDeck.BindDeck(me.Deck.Count);
         MyGrave.BindGraveyard(me.Graveyard.Count);
-        MyTopLeftSlot.BindPlaceholder();
-        MyTopRightSlot.BindPlaceholder();
+        MyTopLeftSlot.BindPlaceholder();             // 我方左下：保留为未来扩展占位
+        MyTopRightSlot.BindBanish(me.Vanished.Count); // 我方右下：放逐区（墓地下方）
         EnemyDeck.BindDeck(enemy.Deck.Count);
         EnemyGrave.BindGraveyard(enemy.Graveyard.Count);
-        EnemyTopLeftSlot.BindPlaceholder();
-        EnemyTopRightSlot.BindPlaceholder();
+        EnemyTopLeftSlot.BindBanish(enemy.Vanished.Count); // 对手左上：从对手视角看是墓地下方
+        EnemyTopRightSlot.BindPlaceholder();         // 对手右上：保留占位
 
         MyInfo.Rebind(me, myTurn);
         EnemyInfo.Rebind(enemy, !myTurn);
