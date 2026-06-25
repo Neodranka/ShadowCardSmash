@@ -13,10 +13,10 @@ namespace ShadowCardSmash.View;
 /// </summary>
 public partial class CardView : PanelContainer
 {
-    public const int CardWidth = 200;
-    public const int CardHeight = 288;
+    public const int CardWidth = 160;
+    public const int CardHeight = 232;
 
-    // Source design constants (414×594).
+    // Source design constants (414×594) — labels scale per FrameScale but minimum font sizes enforced.
     private const float SrcW = 414f;
     private const float SrcH = 594f;
     private static readonly float FrameScale = CardWidth / SrcW;
@@ -95,24 +95,24 @@ public partial class CardView : PanelContainer
         };
         _innerRoot.AddChild(_frameTex);
 
-        // Layer 2: text overlays. Each label is sized into a square big enough to hold the centered text
-        // and positioned so its center equals the source coordinate.
-        _cost = MakeBadgeLabel(36, new Color(1, 1, 1));
-        AnchorCentered(_cost, 57, 57, halfBox: 26);
+        // Layer 2: text overlays. Each label is sized into a box big enough for centered text (incl. 2-digit values)
+        // and positioned so its center equals the source diamond coordinate.
+        _cost = MakeBadgeLabel(36, new Color(1, 1, 1), minPx: 13);
+        AnchorCentered(_cost, 57, 57, halfBox: 38);
         _innerRoot.AddChild(_cost);
 
-        _name = MakeBadgeLabel(22, new Color(0.95f, 0.88f, 0.7f), bold: true);
+        _name = MakeBadgeLabel(22, new Color(0.95f, 0.88f, 0.7f), minPx: 12, bold: true);
         _name.AddThemeColorOverride("font_outline_color", new Color(0, 0, 0, 0.85f));
         _name.AddThemeConstantOverride("outline_size", 4);
-        AnchorCentered(_name, 207, 54, halfBoxW: 145, halfBoxH: 20);
+        AnchorCentered(_name, 207, 54, halfBoxW: 165, halfBoxH: 22);
         _innerRoot.AddChild(_name);
 
-        _atk = MakeBadgeLabel(34, new Color(1, 1, 1));
-        AnchorCentered(_atk, 57, 537, halfBox: 26);
+        _atk = MakeBadgeLabel(34, new Color(1, 1, 1), minPx: 13);
+        AnchorCentered(_atk, 57, 537, halfBox: 38);
         _innerRoot.AddChild(_atk);
 
-        _hp = MakeBadgeLabel(34, new Color(1, 1, 1));
-        AnchorCentered(_hp, 357, 537, halfBox: 26);
+        _hp = MakeBadgeLabel(34, new Color(1, 1, 1), minPx: 13);
+        AnchorCentered(_hp, 357, 537, halfBox: 38);
         _innerRoot.AddChild(_hp);
 
         // Shield overlay — added last so it draws on top of everything else.
@@ -215,7 +215,7 @@ public partial class CardView : PanelContainer
         return ResourceLoader.Exists(path) ? GD.Load<Texture2D>(path) : null;
     }
 
-    private static Label MakeBadgeLabel(int srcFontSize, Color color, bool bold = false)
+    private static Label MakeBadgeLabel(int srcFontSize, Color color, int minPx = 10, bool bold = false)
     {
         var l = new Label
         {
@@ -224,7 +224,8 @@ public partial class CardView : PanelContainer
             Modulate = color,
             MouseFilter = MouseFilterEnum.Ignore,
         };
-        l.AddThemeFontSizeOverride("font_size", Mathf.RoundToInt(srcFontSize * FrameScale));
+        int scaledPx = Mathf.RoundToInt(srcFontSize * FrameScale);
+        l.AddThemeFontSizeOverride("font_size", Math.Max(minPx, scaledPx));
         return l;
     }
 
