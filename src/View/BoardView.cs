@@ -20,6 +20,7 @@ public partial class BoardView : Control
     public const int TileRowWidth = PlayerState.FieldSize * TileSlotView.Width + (PlayerState.FieldSize - 1) * 8;
 
     [Signal] public delegate void HandCardClickedEventHandler(int sideIndex, int instanceId);
+    [Signal] public delegate void HandStripClickedEventHandler(int sideIndex);
     [Signal] public delegate void TileClickedEventHandler(int sideIndex, int tileIndex);
     [Signal] public delegate void MinionClickedEventHandler(int sideIndex, int instanceId);
     [Signal] public delegate void HeroClickedEventHandler(int sideIndex);
@@ -86,8 +87,8 @@ public partial class BoardView : Control
         EnemyGrave = MakePileSlot();
         EnemyTopRightSlot = MakePileSlot();
         EnemyDeck = MakePileSlot();
-        EnemyHand = new HandView { ShowFaces = false };
-        EnemyHand.CardSelected += iid => EmitSignal(SignalName.HandCardClicked, (int)EnemyHand.Side, iid);
+        EnemyHand = new HandView { ShowFaces = false, Mode = HandView.DisplayMode.Peek };
+        // Enemy strip is never expanded — clicking it does nothing (no signal wiring needed).
         EnemyInfo = new PlayerInfoPanel { CustomMinimumSize = new Vector2(TileRowWidth, 70), SizeFlagsHorizontal = SizeFlags.Fill };
         EnemyInfo.HeroClicked += idx => EmitSignal(SignalName.HeroClicked, idx);
         EnemyTiles = BuildPlayerSection(
@@ -114,10 +115,9 @@ public partial class BoardView : Control
         MyDeck = MakePileSlot();
         MyTopRightSlot = MakePileSlot();
         MyGrave = MakePileSlot();
-        MyHand = new HandView { ShowFaces = true };
-        MyHand.CardSelected += iid => EmitSignal(SignalName.HandCardClicked, (int)MyHand.Side, iid);
-        MyHand.CardHovered += OnHandCardHovered;
-        MyHand.CardHoverExited += _ => DetailPanel.HoverHide();
+        MyHand = new HandView { ShowFaces = true, Mode = HandView.DisplayMode.Peek };
+        // In peek mode MyHand re-emits StripClicked instead of per-card events; the controller opens HandPopup.
+        MyHand.StripClicked += sideIdx => EmitSignal(SignalName.HandStripClicked, sideIdx);
         MyInfo = new PlayerInfoPanel { CustomMinimumSize = new Vector2(TileRowWidth, 70), SizeFlagsHorizontal = SizeFlags.Fill };
         MyInfo.HeroClicked += idx => EmitSignal(SignalName.HeroClicked, idx);
         MyTiles = BuildPlayerSection(

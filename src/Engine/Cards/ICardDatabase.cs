@@ -47,6 +47,7 @@ public interface ICardScript
     int EvolvedHealth { get; }
     Keyword InitialKeywords { get; }
     int InitialCountdown { get; }
+    string ArtPath { get; }
 
     // Engine-side hook invocations. Most card scripts override only a few.
     void OnPlay(GameContext ctx);

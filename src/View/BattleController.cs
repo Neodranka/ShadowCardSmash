@@ -58,6 +58,7 @@ public partial class BattleController : Node
         _board.EndTurnClicked += OnEndTurnClicked;
         _board.PileClicked += OnPileClicked;
         _board.EvolveButtonClicked += OnEvolveButtonClicked;
+        _board.HandStripClicked += OnHandStripClicked;
 
         StartHotSeatGame();
     }
@@ -333,6 +334,42 @@ public partial class BattleController : Node
         TrySubmit(new EndTurnAction(LocalSide));
     }
 
+    private void OnHandStripClicked(int sideIndex)
+    {
+        if (_isAnimating || _loop.IsGameOver) return;
+        var side = (PlayerSide)sideIndex;
+        if (side != LocalSide) return;
+        // If we're already in some selection mode, ignore (player should finish or cancel first).
+        if (_mode != Mode.Idle) return;
+        if (IsHandPopupOpen()) return;
+
+        var popup = new HandPopup();
+        AddChild(popup);
+        var me = _loop.State.GetPlayer(LocalSide);
+        popup.Populate(me.Hand, _registry, me.Mana, LocalSide);
+        _board.MyHand.Visible = false;
+        popup.CardSelected += iid =>
+        {
+            // Route through the existing play-card pipeline, then close the popup.
+            popup.QueueFree();
+            _board.MyHand.Visible = true;
+            OnHandCardClicked((int)LocalSide, iid);
+        };
+        popup.CardHovered += iid => _board.HoverDetailForId(iid);
+        popup.CardHoverExited += _ => _board.DetailPanel.HoverHide();
+        popup.Cancelled += () =>
+        {
+            _board.MyHand.Visible = true;
+        };
+    }
+
+    private bool IsHandPopupOpen()
+    {
+        foreach (var c in GetChildren())
+            if (c is HandPopup) return true;
+        return false;
+    }
+
     private void OnEvolveButtonClicked(int sideIndex)
     {
         if (_isAnimating || _loop.IsGameOver) return;
@@ -554,9 +591,12 @@ public partial class BattleController : Node
         _board.ClearHighlights();
         _board.UnpinDetail();
         if (_board.MyEvolveButton is not null) _board.MyEvolveButton.SetActive(false);
-        // Close any open choice popup.
+        // Close any open choice popup or hand popup.
         foreach (var c in GetChildren())
-            if (c is ChoicePopup p) p.QueueFree();
+        {
+            if (c is ChoicePopup cp) cp.QueueFree();
+            else if (c is HandPopup hp) { hp.QueueFree(); _board.MyHand.Visible = true; }
+        }
     }
 
     /// <summary>

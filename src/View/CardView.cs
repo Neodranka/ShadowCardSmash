@@ -5,13 +5,21 @@ using ShadowCardSmash.Engine;
 namespace ShadowCardSmash.View;
 
 /// <summary>
-/// Minimal card face: cost badge, central art placeholder, attack / health corners. All other detail
-/// (description, keywords, tags, type) is shown by <see cref="CardDetailPanel"/> when the card is hovered or selected.
+/// Card face built from a rarity-specific frame PNG (art/ui/cards/frame_*.png, 414×594 source)
+/// rendered as a TextureRect, with the card art and dynamic text/numbers overlaid at fixed coordinates.
+///
+/// Native scale factor: 200/414 ≈ 0.483; text size + coordinates derive from the original 414×594 design.
+/// See 设定文档/卡牌框架坐标_v1.txt for the source-of-truth layout spec.
 /// </summary>
 public partial class CardView : PanelContainer
 {
-    public const int CardWidth = 140;
-    public const int CardHeight = 190;
+    public const int CardWidth = 200;
+    public const int CardHeight = 288;
+
+    // Source design constants (414×594).
+    private const float SrcW = 414f;
+    private const float SrcH = 594f;
+    private static readonly float FrameScale = CardWidth / SrcW;
 
     [Signal] public delegate void ClickedEventHandler(int instanceId);
     [Signal] public delegate void HoverEnteredEventHandler(int instanceId);
@@ -22,14 +30,14 @@ public partial class CardView : PanelContainer
     public bool IsOnField { get; private set; }
 
     private Control _innerRoot = null!;
+    private TextureRect _frameTex = null!;
+    private TextureRect _artTex = null!;
+    private Label _artPlaceholder = null!;
     private Label _cost = null!;
+    private Label _name = null!;
     private Label _atk = null!;
     private Label _hp = null!;
-    private Panel _artPanel = null!;
     private CardShieldOverlay _shieldOverlay = null!;
-    private StyleBoxFlat _stylebox = null!;
-    private StyleBoxFlat _costStyle = null!;
-    private StyleBoxFlat _artStyle = null!;
     private bool _builtUi;
 
     public override void _Ready()
@@ -46,84 +54,68 @@ public partial class CardView : PanelContainer
         if (_builtUi) return;
         _builtUi = true;
 
-        _stylebox = new StyleBoxFlat
-        {
-            BgColor = new Color(0.18f, 0.12f, 0.22f),
-            BorderColor = new Color(0.6f, 0.5f, 0.8f),
-            BorderWidthTop = 2, BorderWidthBottom = 2, BorderWidthLeft = 2, BorderWidthRight = 2,
-            CornerRadiusTopLeft = 6, CornerRadiusTopRight = 6, CornerRadiusBottomLeft = 6, CornerRadiusBottomRight = 6,
-            ContentMarginLeft = 0, ContentMarginRight = 0, ContentMarginTop = 0, ContentMarginBottom = 0,
-        };
-        AddThemeStyleboxOverride("panel", _stylebox);
+        // PanelContainer needs a transparent style so the PNG frame is unobstructed by any default panel chrome.
+        var empty = new StyleBoxEmpty();
+        AddThemeStyleboxOverride("panel", empty);
 
-        // Inner Control fills the PanelContainer; positioned children use anchors on this Control.
+        // One inner Control hosts all positioned children with full anchors.
         _innerRoot = new Control { MouseFilter = MouseFilterEnum.Ignore };
         AddChild(_innerRoot);
 
-        // Art placeholder fills the middle.
-        _artStyle = new StyleBoxFlat
+        // Layer 0: card art texture (in art_rect 57,97 → 357,537 of source).
+        _artTex = new TextureRect
         {
-            BgColor = new Color(0.32f, 0.22f, 0.4f),
-            CornerRadiusTopLeft = 4, CornerRadiusTopRight = 4, CornerRadiusBottomLeft = 4, CornerRadiusBottomRight = 4,
-        };
-        _artPanel = new Panel
-        {
-            AnchorLeft = 0, AnchorTop = 0, AnchorRight = 1, AnchorBottom = 1,
-            OffsetLeft = 10, OffsetTop = 38, OffsetRight = -10, OffsetBottom = -42,
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCovered,
             MouseFilter = MouseFilterEnum.Ignore,
         };
-        _artPanel.AddThemeStyleboxOverride("panel", _artStyle);
-        _innerRoot.AddChild(_artPanel);
+        AnchorBox(_artTex, 57, 97, 357, 537);
+        _innerRoot.AddChild(_artTex);
 
-        // Cost badge — circular blue pill in top-left.
-        _costStyle = new StyleBoxFlat
+        // Art placeholder text (shown when no ArtPath given).
+        _artPlaceholder = new Label
         {
-            BgColor = new Color(0.15f, 0.35f, 0.7f),
-            BorderColor = new Color(0.7f, 0.85f, 1f),
-            BorderWidthTop = 2, BorderWidthBottom = 2, BorderWidthLeft = 2, BorderWidthRight = 2,
-            CornerRadiusTopLeft = 16, CornerRadiusTopRight = 16, CornerRadiusBottomLeft = 16, CornerRadiusBottomRight = 16,
-        };
-        var costContainer = new PanelContainer
-        {
-            AnchorLeft = 0, AnchorTop = 0, AnchorRight = 0, AnchorBottom = 0,
-            OffsetLeft = 4, OffsetTop = 4, OffsetRight = 36, OffsetBottom = 36,
-            MouseFilter = MouseFilterEnum.Ignore,
-        };
-        costContainer.AddThemeStyleboxOverride("panel", _costStyle);
-        _innerRoot.AddChild(costContainer);
-        _cost = new Label { Text = "0", HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-        _cost.AddThemeFontSizeOverride("font_size", 20);
-        costContainer.AddChild(_cost);
-
-        // Attack bottom-left.
-        _atk = new Label
-        {
-            Text = "",
-            AnchorLeft = 0, AnchorTop = 1, AnchorRight = 0, AnchorBottom = 1,
-            OffsetLeft = 8, OffsetTop = -34, OffsetRight = 40, OffsetBottom = -4,
-            Modulate = new Color(1f, 0.85f, 0.4f),
-            HorizontalAlignment = HorizontalAlignment.Left,
+            Text = "CARD\nART",
+            HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
+            Modulate = new Color(0.5f, 0.42f, 0.32f),
             MouseFilter = MouseFilterEnum.Ignore,
         };
-        _atk.AddThemeFontSizeOverride("font_size", 24);
+        _artPlaceholder.AddThemeFontSizeOverride("font_size", Mathf.RoundToInt(28 * FrameScale));
+        AnchorBox(_artPlaceholder, 57, 97, 357, 537);
+        _innerRoot.AddChild(_artPlaceholder);
+
+        // Layer 1: frame texture (full card area).
+        _frameTex = new TextureRect
+        {
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.Scale,
+            MouseFilter = MouseFilterEnum.Ignore,
+            AnchorRight = 1, AnchorBottom = 1,
+        };
+        _innerRoot.AddChild(_frameTex);
+
+        // Layer 2: text overlays. Each label is sized into a square big enough to hold the centered text
+        // and positioned so its center equals the source coordinate.
+        _cost = MakeBadgeLabel(36, new Color(1, 1, 1));
+        AnchorCentered(_cost, 57, 57, halfBox: 26);
+        _innerRoot.AddChild(_cost);
+
+        _name = MakeBadgeLabel(22, new Color(0.95f, 0.88f, 0.7f), bold: true);
+        _name.AddThemeColorOverride("font_outline_color", new Color(0, 0, 0, 0.85f));
+        _name.AddThemeConstantOverride("outline_size", 4);
+        AnchorCentered(_name, 207, 54, halfBoxW: 145, halfBoxH: 20);
+        _innerRoot.AddChild(_name);
+
+        _atk = MakeBadgeLabel(34, new Color(1, 1, 1));
+        AnchorCentered(_atk, 57, 537, halfBox: 26);
         _innerRoot.AddChild(_atk);
 
-        // Health bottom-right.
-        _hp = new Label
-        {
-            Text = "",
-            AnchorLeft = 1, AnchorTop = 1, AnchorRight = 1, AnchorBottom = 1,
-            OffsetLeft = -40, OffsetTop = -34, OffsetRight = -8, OffsetBottom = -4,
-            Modulate = new Color(1f, 0.4f, 0.4f),
-            HorizontalAlignment = HorizontalAlignment.Right,
-            VerticalAlignment = VerticalAlignment.Center,
-            MouseFilter = MouseFilterEnum.Ignore,
-        };
-        _hp.AddThemeFontSizeOverride("font_size", 24);
+        _hp = MakeBadgeLabel(34, new Color(1, 1, 1));
+        AnchorCentered(_hp, 357, 537, halfBox: 26);
         _innerRoot.AddChild(_hp);
 
-        // Shield overlay — added last so it draws on top of art / labels.
+        // Shield overlay — added last so it draws on top of everything else.
         _shieldOverlay = new CardShieldOverlay();
         AddChild(_shieldOverlay);
         _shieldOverlay.Visible = false;
@@ -137,23 +129,31 @@ public partial class CardView : PanelContainer
         IsOnField = onField;
         _innerRoot.Visible = true;
 
-        // Enhance preview: when viewing this card in hand and the owner has enough mana to trigger 强化,
-        // the cost badge shows the enhance value in green.
-        bool enhanceActive = !onField && script.EnhanceCost > 0 && viewerMana >= script.EnhanceCost;
-        int displayCost = enhanceActive ? script.EnhanceCost : script.Cost;
-        _cost.Text = displayCost.ToString();
-        if (enhanceActive)
+        // Frame by rarity (frame_bronze / silver / gold / legendary).
+        _frameTex.Texture = LoadFrameTexture(script.Rarity);
+
+        // Card art (placeholder when ArtPath is empty/missing).
+        var artPath = script.ArtPath;
+        if (!string.IsNullOrEmpty(artPath) && ResourceLoader.Exists(artPath))
         {
-            _costStyle.BgColor = new Color(0.20f, 0.65f, 0.30f);    // green pill
-            _costStyle.BorderColor = new Color(0.65f, 1f, 0.55f);
-            _cost.Modulate = new Color(1f, 1f, 1f);
+            _artTex.Texture = GD.Load<Texture2D>(artPath);
+            _artTex.Visible = true;
+            _artPlaceholder.Visible = false;
         }
         else
         {
-            _costStyle.BgColor = new Color(0.15f, 0.35f, 0.70f);    // default blue pill
-            _costStyle.BorderColor = new Color(0.7f, 0.85f, 1f);
-            _cost.Modulate = new Color(1f, 1f, 1f);
+            _artTex.Texture = null;
+            _artTex.Visible = false;
+            _artPlaceholder.Visible = true;
         }
+
+        // 强化预览：手牌中费用满足时显示绿色 X，否则原费用。
+        bool enhanceActive = !onField && script.EnhanceCost > 0 && viewerMana >= script.EnhanceCost;
+        int displayCost = enhanceActive ? script.EnhanceCost : script.Cost;
+        _cost.Text = displayCost.ToString();
+        _cost.Modulate = enhanceActive ? new Color(0.55f, 1f, 0.55f) : new Color(1, 1, 1);
+
+        _name.Text = script.Name;
 
         if (script.CardType == CardType.Minion)
         {
@@ -166,9 +166,9 @@ public partial class CardView : PanelContainer
         else if (script.CardType == CardType.Amulet)
         {
             int cd = onField ? card.Countdown : script.InitialCountdown;
-            _atk.Text = "";
-            _hp.Text = cd >= 0 ? $"⏳{cd}" : "";
-            _atk.Visible = false; _hp.Visible = cd >= 0;
+            _atk.Visible = false;
+            _hp.Text = cd >= 0 ? cd.ToString() : "";
+            _hp.Visible = cd >= 0;
         }
         else
         {
@@ -176,10 +176,12 @@ public partial class CardView : PanelContainer
             _hp.Visible = false;
         }
 
-        ApplyAccentColors(card, script, onField);
+        // Silence dims the whole card.
+        Modulate = (onField && card.IsSilenced) ? new Color(0.55f, 0.55f, 0.55f) : new Color(1, 1, 1);
+
         TooltipText = $"{script.Name}\n{script.Description}";
 
-        // Shield overlay only on the battlefield, never in hand.
+        // Field-only shield ellipses.
         if (onField)
         {
             bool ward = card.HasKeyword(Keyword.Ward);
@@ -192,9 +194,7 @@ public partial class CardView : PanelContainer
         }
     }
 
-    /// <summary>
-    /// Render as an opaque card back: hide all face content. Used for the opponent hand in hot seat.
-    /// </summary>
+    /// <summary>Render as an opaque card back (opponent hand in hot seat).</summary>
     public void BindFaceDown()
     {
         BuildUi();
@@ -202,43 +202,55 @@ public partial class CardView : PanelContainer
         Card = CardId.None;
         IsOnField = false;
         _innerRoot.Visible = false;
-
-        _stylebox.BgColor = new Color(0.10f, 0.08f, 0.16f);
-        _stylebox.BorderColor = new Color(0.45f, 0.4f, 0.55f);
-        _stylebox.BorderWidthTop = 3; _stylebox.BorderWidthBottom = 3;
-        _stylebox.BorderWidthLeft = 3; _stylebox.BorderWidthRight = 3;
-        Modulate = new Color(1, 1, 1);
+        // Reuse the bronze frame as the universal "card back" without overlays.
+        // A dedicated card-back PNG can replace this later.
+        _frameTex.Texture = LoadFrameTexture(Rarity.Bronze);
+        Modulate = new Color(0.35f, 0.32f, 0.45f);
         TooltipText = "对手手牌";
     }
 
-    private void ApplyAccentColors(RuntimeCard card, ICardScript script, bool onField)
+    private static Texture2D? LoadFrameTexture(Rarity rarity)
     {
-        var baseBorder = script.HeroClass switch
+        var path = $"res://art/ui/cards/frame_{rarity.ToString().ToLower()}.png";
+        return ResourceLoader.Exists(path) ? GD.Load<Texture2D>(path) : null;
+    }
+
+    private static Label MakeBadgeLabel(int srcFontSize, Color color, bool bold = false)
+    {
+        var l = new Label
         {
-            HeroClass.Forsaken => new Color(0.85f, 0.25f, 0.35f),
-            HeroClass.Neutral => new Color(0.55f, 0.55f, 0.65f),
-            HeroClass.Empire => new Color(0.85f, 0.75f, 0.35f),
-            HeroClass.ClassC => new Color(0.35f, 0.85f, 0.45f),
-            _ => new Color(0.6f, 0.5f, 0.8f),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Modulate = color,
+            MouseFilter = MouseFilterEnum.Ignore,
         };
-        int borderW = 2;
-        var borderColor = baseBorder;
+        l.AddThemeFontSizeOverride("font_size", Mathf.RoundToInt(srcFontSize * FrameScale));
+        return l;
+    }
 
-        var effectiveKeywords = onField ? card.Keywords : script.InitialKeywords;
-        bool hasWard = (effectiveKeywords & Keyword.Ward) == Keyword.Ward;
+    private static void AnchorBox(Control c, float srcLeft, float srcTop, float srcRight, float srcBottom)
+    {
+        c.AnchorLeft = 0; c.AnchorTop = 0; c.AnchorRight = 0; c.AnchorBottom = 0;
+        c.OffsetLeft = srcLeft * FrameScale;
+        c.OffsetTop = srcTop * FrameScale;
+        c.OffsetRight = srcRight * FrameScale;
+        c.OffsetBottom = srcBottom * FrameScale;
+    }
 
-        if (hasWard) { borderColor = new Color(1f, 0.85f, 0.3f); borderW = 5; }
-        else if (onField && card.IsEvolved) { borderColor = new Color(1f, 0.55f, 1f); borderW = 4; }
+    private static void AnchorCentered(Control c, float srcX, float srcY, float halfBox)
+        => AnchorCentered(c, srcX, srcY, halfBox, halfBox);
 
-        _stylebox.BgColor = new Color(0.18f, 0.12f, 0.22f);
-        _stylebox.BorderColor = borderColor;
-        _stylebox.BorderWidthTop = borderW; _stylebox.BorderWidthBottom = borderW;
-        _stylebox.BorderWidthLeft = borderW; _stylebox.BorderWidthRight = borderW;
-
-        // Art-area tint hints at class so it isn't a featureless box until real art arrives.
-        _artStyle.BgColor = baseBorder * new Color(0.5f, 0.5f, 0.5f, 1f);
-
-        Modulate = (onField && card.IsSilenced) ? new Color(0.55f, 0.55f, 0.55f) : new Color(1, 1, 1);
+    private static void AnchorCentered(Control c, float srcX, float srcY, float halfBoxW, float halfBoxH)
+    {
+        float cx = srcX * FrameScale;
+        float cy = srcY * FrameScale;
+        float hw = halfBoxW * FrameScale;
+        float hh = halfBoxH * FrameScale;
+        c.AnchorLeft = 0; c.AnchorTop = 0; c.AnchorRight = 0; c.AnchorBottom = 0;
+        c.OffsetLeft = cx - hw;
+        c.OffsetTop = cy - hh;
+        c.OffsetRight = cx + hw;
+        c.OffsetBottom = cy + hh;
     }
 
     private void OnGuiInput(InputEvent e)

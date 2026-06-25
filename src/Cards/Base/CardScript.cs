@@ -44,6 +44,7 @@ public abstract class CardScript : ICardScript
     public virtual int EvolvedHealth => Data?.EvolvedHealth ?? 0;
     public virtual Keyword InitialKeywords => Data?.InitialKeywords ?? Keyword.None;
     public virtual int InitialCountdown => Data?.InitialCountdown ?? -1;
+    public virtual string ArtPath => Data?.ArtPath ?? "";
 
     protected CardScript()
     {
