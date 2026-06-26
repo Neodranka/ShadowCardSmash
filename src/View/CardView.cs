@@ -119,7 +119,7 @@ public partial class CardView : PanelContainer
         // Ward PNG is opaque-ish by design; dim it heavily via Modulate so it reads as a subtle aura.
         _shieldWard = MakeOverlayRect();
         AnchorBox(_shieldWard, 0, 30, 360, 510);       // 360×480 centered with 30 src margin top/bottom
-        _shieldWard.Modulate = new Color(1f, 1f, 1f, 0.30f);
+        _shieldWard.Modulate = new Color(1f, 1f, 1f, 0.50f);
         _innerRoot.AddChild(_shieldWard);
 
         _shieldBarrier = MakeOverlayRect();
