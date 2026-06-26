@@ -32,6 +32,7 @@ public partial class HandView : Control
 
     // Full-mode visual constants — kept here so tuning is one place.
     private const float FanAngleDeg = 10f;            // ± spread between leftmost and rightmost card
+    private const float ArcDropPerStep = 10f;         // each card-step away from center sinks by this many px
     private const float HoverLift = 30f;              // px upward on hover
     private const float HoverTweenSec = 0.12f;
     private const int HoverZIndex = 100;
@@ -99,7 +100,18 @@ public partial class HandView : Control
 
             // Rotate around card center so the visual "splay" pivots cleanly.
             cv.PivotOffset = new Vector2(cardW / 2f, cardH / 2f);
-            var basePos = new Vector2(startX + i * step, 0);
+
+            // Arc drop: cards further from the center pair (even N) / center card (odd N) sit lower.
+            // For N=10 → cards 4,5 stay at y=0; cards 3,6 drop 10px; 2,7 drop 20; 1,8 drop 30; 0,9 drop 40.
+            float arcY = 0f;
+            if (fan)
+            {
+                float centerIdx = (_cardsCache.Count - 1) / 2f;
+                float dist = Math.Abs(i - centerIdx);
+                float stepDist = (_cardsCache.Count % 2 == 0) ? Math.Max(0f, dist - 0.5f) : dist;
+                arcY = stepDist * ArcDropPerStep;
+            }
+            var basePos = new Vector2(startX + i * step, arcY);
             cv.ZIndex = i; // rightmost on top
             int baseZ = i;
 
