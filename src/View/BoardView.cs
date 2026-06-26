@@ -20,6 +20,9 @@ public partial class BoardView : Control
     public const int TileSeparation = 4;
     public const int TerrainGap = 4;
     public const int TileRowWidth = PlayerState.FieldSize * TileSlotView.Width + (PlayerState.FieldSize - 1) * TileSeparation;
+    // Pulls each side's field row toward the center HSep by this many pixels (both sides + same amount =
+    // symmetric shift; HSep position is unchanged because the ExpandFill spacers absorb equally).
+    public const int FieldCenterPull = 30;
 
     [Signal] public delegate void HandCardClickedEventHandler(int sideIndex, int instanceId);
     [Signal] public delegate void HandStripClickedEventHandler(int sideIndex);
@@ -202,15 +205,21 @@ public partial class BoardView : Control
         var tiles = new TileSlotView[PlayerState.FieldSize];
         var fieldRow = BuildBareFieldRow(tiles, out terrainSlot);
 
+        // Wrap the field in a MarginContainer that pads the "outer" edge (toward hand) — this shifts the
+        // field row visually toward the central HSep without changing card sizes.
+        var fieldWrap = new MarginContainer();
+        fieldWrap.AddThemeConstantOverride(isTopSide ? "margin_top" : "margin_bottom", FieldCenterPull);
+        fieldWrap.AddChild(fieldRow);
+
         if (isTopSide)
         {
             middle.AddChild(infoPanel);
             middle.AddChild(handRow);
-            middle.AddChild(fieldRow);
+            middle.AddChild(fieldWrap);
         }
         else
         {
-            middle.AddChild(fieldRow);
+            middle.AddChild(fieldWrap);
             middle.AddChild(handRow);
             middle.AddChild(infoPanel);
         }
