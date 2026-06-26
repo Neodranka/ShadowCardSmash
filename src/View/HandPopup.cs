@@ -42,10 +42,11 @@ public partial class HandPopup : Control
         AddChild(dim);
 
         // Centered container near the bottom of the screen — cards visually slide up from the peek strip.
+        // Extra headroom on top so hover-lifted cards (D+E fan/lift) are not clipped.
         var center = new Control
         {
             AnchorLeft = 0, AnchorTop = 1, AnchorRight = 1, AnchorBottom = 1,
-            OffsetLeft = 0, OffsetTop = -(CardView.CardHeight + 40), OffsetRight = 0, OffsetBottom = -20,
+            OffsetLeft = 0, OffsetTop = -(CardView.CardHeight + 80), OffsetRight = 0, OffsetBottom = -20,
             MouseFilter = MouseFilterEnum.Ignore,
         };
         AddChild(center);

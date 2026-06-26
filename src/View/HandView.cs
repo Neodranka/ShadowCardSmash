@@ -30,6 +30,15 @@ public partial class HandView : Control
     private ICardDatabase? _dbCache;
     private int _manaCache;
 
+    // Full-mode visual constants — kept here so tuning is one place.
+    private const float FanAngleDeg = 10f;            // ± spread between leftmost and rightmost card
+    private const float HoverLift = 30f;              // px upward on hover
+    private const float HoverTweenSec = 0.12f;
+    private const int HoverZIndex = 100;
+
+    // One running tween per card (keyed by instance id) so spamming hover doesn't stack tweens.
+    private readonly Dictionary<ulong, Tween> _hoverTweens = new();
+
     public override void _Ready()
     {
         SizeFlagsHorizontal = SizeFlags.ExpandFill;
@@ -62,15 +71,19 @@ public partial class HandView : Control
             RemoveChild(c);
             c.QueueFree();
         }
+        _hoverTweens.Clear();
         if (_cardsCache.Count == 0) return;
 
         int cardW = CardView.CardWidth;
-        // Peek: heavy overlap; Full: separate with small gap.
+        int cardH = CardView.CardHeight;
+        // Peek: heavy overlap; Full: wider step so rotated corners don't crowd.
         int step = Mode == DisplayMode.Peek
             ? (int)(cardW * 0.32f)
-            : cardW + 12;
+            : cardW + 24;
         int totalWidth = (_cardsCache.Count - 1) * step + cardW;
         float startX = Math.Max(0f, ((float)Size.X - totalWidth) / 2f);
+
+        bool fan = Mode == DisplayMode.Full && _cardsCache.Count > 1;
 
         for (int i = 0; i < _cardsCache.Count; i++)
         {
@@ -81,10 +94,21 @@ public partial class HandView : Control
             if (ShowFaces) cv.Bind(card, _dbCache.Get(card.Card), onField: false, viewerMana: _manaCache);
             else cv.BindFaceDown();
 
-            cv.Position = new Vector2(startX + i * step, 0);
+            // Rotate around card center so the visual "splay" pivots cleanly.
+            cv.PivotOffset = new Vector2(cardW / 2f, cardH / 2f);
+            var basePos = new Vector2(startX + i * step, 0);
+            cv.Position = basePos;
             cv.ZIndex = i; // rightmost on top
+            int baseZ = i;
 
-            int captured = card.Instance.Value;
+            float baseRotRad = 0f;
+            if (fan)
+            {
+                float t = (float)i / (_cardsCache.Count - 1);
+                baseRotRad = Mathf.DegToRad(Mathf.Lerp(-FanAngleDeg, FanAngleDeg, t));
+            }
+            cv.Rotation = baseRotRad;
+
             if (Mode == DisplayMode.Peek)
             {
                 // Any click in peek mode → ask the controller to expand the popup.
@@ -97,8 +121,28 @@ public partial class HandView : Control
                 cv.Clicked += iid => EmitSignal(SignalName.CardSelected, iid);
                 cv.HoverEntered += iid => EmitSignal(SignalName.CardHovered, iid);
                 cv.HoverExited += iid => EmitSignal(SignalName.CardHoverExited, iid);
+                // Hover lift: rise + straighten + raise Z. Capture base in closures.
+                var capturedCv = cv;
+                var capturedBasePos = basePos;
+                var capturedBaseRot = baseRotRad;
+                int capturedBaseZ = baseZ;
+                cv.MouseEntered += () => TweenHover(capturedCv, capturedBasePos + new Vector2(0, -HoverLift), 0f, HoverZIndex);
+                cv.MouseExited  += () => TweenHover(capturedCv, capturedBasePos, capturedBaseRot, capturedBaseZ);
             }
         }
+    }
+
+    private void TweenHover(CardView cv, Vector2 targetPos, float targetRot, int targetZ)
+    {
+        var id = cv.GetInstanceId();
+        if (_hoverTweens.TryGetValue(id, out var prev) && GodotObject.IsInstanceValid(prev))
+            prev.Kill();
+        var t = cv.CreateTween();
+        t.SetEase(Tween.EaseType.Out).SetTrans(Tween.TransitionType.Cubic);
+        t.TweenProperty(cv, "position", targetPos, HoverTweenSec);
+        t.Parallel().TweenProperty(cv, "rotation", targetRot, HoverTweenSec);
+        _hoverTweens[id] = t;
+        cv.ZIndex = targetZ;
     }
 
     private void OnStripBackgroundInput(InputEvent e)
