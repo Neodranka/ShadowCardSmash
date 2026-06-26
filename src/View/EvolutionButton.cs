@@ -11,7 +11,7 @@ namespace ShadowCardSmash.View;
 /// </summary>
 public partial class EvolutionButton : PanelContainer
 {
-    public const int Width = 110;
+    public const int Width = TileSlotView.Width;
     public const int Height = HandView.PeekStripHeight;
 
     [Signal] public delegate void EvolveButtonClickedEventHandler(int sideIndex);

@@ -10,8 +10,8 @@ namespace ShadowCardSmash.View;
 /// </summary>
 public partial class PileView : PanelContainer
 {
-    // Pile flanks are visually decoupled from tile width so that the row fits 1920 even with large tiles.
-    public const int SlotWidth = 120;
+    // Pile flanks are visually decoupled from tile width so that the row fits 1920 even with larger tiles.
+    public const int SlotWidth = 180;
     public const int SlotHeight = TileSlotView.Height / 2 - 2; // two pile slots = one tile-row height
 
     public enum Kind { Deck, Graveyard, Placeholder, Banish }
