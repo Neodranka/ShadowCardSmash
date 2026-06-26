@@ -166,6 +166,10 @@ public partial class HandView : Control
         var id = cv.GetInstanceId();
         if (_hoverTweens.TryGetValue(id, out var prev) && GodotObject.IsInstanceValid(prev))
             prev.Kill();
+        // Force alpha back to 1: if hover interrupts the expand fade-in, the killed expand tween
+        // leaves alpha < 1 since hover only animates position/rotation. Snap it back here so the
+        // card stays fully visible regardless of when hover takes over.
+        var col = cv.Modulate; col.A = 1f; cv.Modulate = col;
         var t = cv.CreateTween();
         t.SetEase(Tween.EaseType.Out).SetTrans(Tween.TransitionType.Cubic);
         t.TweenProperty(cv, "position", targetPos, HoverTweenSec);
