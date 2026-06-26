@@ -37,11 +37,13 @@ public partial class CardView : PanelContainer
     private TextureRect _diamondCost = null!;
     private TextureRect _diamondAtk = null!;
     private TextureRect _diamondHp = null!;
+    private TextureRect _shieldWard = null!;
+    private TextureRect _shieldBarrier = null!;
+    private TextureRect _attackIcon = null!;
     private Label _cost = null!;
     private Label _name = null!;
     private Label _atk = null!;
     private Label _hp = null!;
-    private CardShieldOverlay _shieldOverlay = null!;
     private bool _builtUi;
 
     public override void _Ready()
@@ -113,7 +115,22 @@ public partial class CardView : PanelContainer
         AnchorBox(_diamondHp, 260, 440, 400, 580);     // center at source (330, 510)
         _innerRoot.AddChild(_diamondHp);
 
-        // Layer 3: text overlays — centered on the diamond / ribbon coordinates.
+        // Layer 3a: shield overlays — semi-transparent PNGs covering the card art area.
+        _shieldWard = MakeOverlayRect();
+        AnchorBox(_shieldWard, 0, 30, 360, 510);       // 360×480 centered with 30 src margin top/bottom
+        _innerRoot.AddChild(_shieldWard);
+
+        _shieldBarrier = MakeOverlayRect();
+        AnchorBox(_shieldBarrier, 20, 40, 340, 500);   // 320×460 centered
+        _innerRoot.AddChild(_shieldBarrier);
+
+        // Layer 3b: attack-ready icon (storm = can attack hero+minion, rush = minion-only).
+        // Full card-body PNG drawn above diamonds, below text so numbers stay readable.
+        _attackIcon = MakeOverlayRect();
+        AnchorBox(_attackIcon, 0, 0, 360, 540);        // full body, the PNGs already align to (0,0)-(360,540)
+        _innerRoot.AddChild(_attackIcon);
+
+        // Layer 4: text overlays — centered on the diamond / ribbon coordinates.
         // Source font sizes calibrated for the 360×540 layout (annotation v3).
         _cost = MakeBadgeLabel(28, new Color(1, 1, 1), minPx: 13);
         AnchorCentered(_cost, 30, 30, halfBox: 30);
@@ -132,11 +149,6 @@ public partial class CardView : PanelContainer
         _hp = MakeBadgeLabel(26, new Color(1, 1, 1), minPx: 13);
         AnchorCentered(_hp, 330, 510, halfBox: 30);
         _innerRoot.AddChild(_hp);
-
-        // Shield overlay — added last so it draws on top of everything else.
-        _shieldOverlay = new CardShieldOverlay();
-        AddChild(_shieldOverlay);
-        _shieldOverlay.Visible = false;
     }
 
     public void Bind(RuntimeCard card, ICardScript script, bool onField, int viewerMana = 0)
@@ -205,16 +217,27 @@ public partial class CardView : PanelContainer
 
         TooltipText = $"{script.Name}\n{script.Description}";
 
-        // Field-only shield ellipses.
+        // Field-only overlays: ward/barrier shields + attack-ready icon (storm/rush).
         if (onField)
         {
-            bool ward = card.HasKeyword(Keyword.Ward);
-            bool barrier = card.BarrierStacks > 0;
-            _shieldOverlay.Refresh(ward, barrier);
+            _shieldWard.Texture = LoadShieldWard();
+            _shieldBarrier.Texture = LoadShieldBarrier();
+            _shieldWard.Visible = card.HasKeyword(Keyword.Ward);
+            _shieldBarrier.Visible = card.BarrierStacks > 0;
+
+            // Storm icon: can attack any target (incl. hero). Rush icon: minion-only on summon turn.
+            bool stormReady = card.CanAttackThisTurn && (!card.SummonedThisTurn || card.HasKeyword(Keyword.Storm));
+            bool rushReady  = card.CanAttackThisTurn && card.SummonedThisTurn
+                              && card.HasKeyword(Keyword.Rush) && !card.HasKeyword(Keyword.Storm);
+            if (stormReady)      { _attackIcon.Texture = LoadAttackIconStorm(); _attackIcon.Visible = true; }
+            else if (rushReady)  { _attackIcon.Texture = LoadAttackIconRush();  _attackIcon.Visible = true; }
+            else                 { _attackIcon.Visible = false; }
         }
         else
         {
-            _shieldOverlay.Refresh(false, false);
+            _shieldWard.Visible = false;
+            _shieldBarrier.Visible = false;
+            _attackIcon.Visible = false;
         }
     }
 
@@ -232,6 +255,9 @@ public partial class CardView : PanelContainer
         _diamondCost.Visible = false;
         _diamondAtk.Visible = false;
         _diamondHp.Visible = false;
+        _shieldWard.Visible = false;
+        _shieldBarrier.Visible = false;
+        _attackIcon.Visible = false;
         Modulate = new Color(0.35f, 0.32f, 0.45f);
         TooltipText = "对手手牌";
     }
@@ -264,6 +290,31 @@ public partial class CardView : PanelContainer
         StretchMode = TextureRect.StretchModeEnum.Scale,
         MouseFilter = MouseFilterEnum.Ignore,
     };
+
+    private static TextureRect MakeOverlayRect() => new()
+    {
+        ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+        StretchMode = TextureRect.StretchModeEnum.Scale,
+        MouseFilter = MouseFilterEnum.Ignore,
+        Visible = false,
+    };
+
+    private static Texture2D? _shieldWardCache;
+    private static Texture2D? _shieldBarrierCache;
+    private static Texture2D? _attackIconStormCache;
+    private static Texture2D? _attackIconRushCache;
+    private static Texture2D? LoadShieldWard()
+        => _shieldWardCache ??= ResourceLoader.Exists("res://art/ui/cards/shield_yellow.png")
+            ? GD.Load<Texture2D>("res://art/ui/cards/shield_yellow.png") : null;
+    private static Texture2D? LoadShieldBarrier()
+        => _shieldBarrierCache ??= ResourceLoader.Exists("res://art/ui/cards/shield_barrier_blue.png")
+            ? GD.Load<Texture2D>("res://art/ui/cards/shield_barrier_blue.png") : null;
+    private static Texture2D? LoadAttackIconStorm()
+        => _attackIconStormCache ??= ResourceLoader.Exists("res://art/ui/cards/icon_storm.png")
+            ? GD.Load<Texture2D>("res://art/ui/cards/icon_storm.png") : null;
+    private static Texture2D? LoadAttackIconRush()
+        => _attackIconRushCache ??= ResourceLoader.Exists("res://art/ui/cards/icon_rush.png")
+            ? GD.Load<Texture2D>("res://art/ui/cards/icon_rush.png") : null;
 
     private static Label MakeBadgeLabel(int srcFontSize, Color color, int minPx = 10, bool bold = false)
     {
