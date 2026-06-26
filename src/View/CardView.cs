@@ -5,20 +5,21 @@ using ShadowCardSmash.Engine;
 namespace ShadowCardSmash.View;
 
 /// <summary>
-/// Card face built from a rarity-specific frame PNG (art/ui/cards/frame_*.png, 414×594 source)
-/// rendered as a TextureRect, with the card art and dynamic text/numbers overlaid at fixed coordinates.
+/// Card face built from a rarity-specific no-diamond frame PNG (art/ui/cards/frame_*_nd.png, 360×540 source)
+/// rendered as a TextureRect, with the card art and dynamic text/numbers overlaid at fixed coordinates,
+/// plus three independent diamond TextureRects (cost/atk/hp) that protrude beyond the frame body.
 ///
-/// Native scale factor: 200/414 ≈ 0.483; text size + coordinates derive from the original 414×594 design.
 /// See 设定文档/卡牌框架坐标_v1.txt for the source-of-truth layout spec.
 /// </summary>
 public partial class CardView : PanelContainer
 {
-    public const int CardWidth = 196;
-    public const int CardHeight = 284;
+    // 2:3 ratio matches the new frame_*_nd asset (360×540 source).
+    public const int CardWidth = 192;
+    public const int CardHeight = 288;
 
-    // Source design constants (414×594) — labels scale per FrameScale but minimum font sizes enforced.
-    private const float SrcW = 414f;
-    private const float SrcH = 594f;
+    // Source design constants (360×540). FrameScale derives uniformly from width — control aspect matches asset.
+    private const float SrcW = 360f;
+    private const float SrcH = 540f;
     private static readonly float FrameScale = CardWidth / SrcW;
 
     [Signal] public delegate void ClickedEventHandler(int instanceId);
@@ -65,14 +66,14 @@ public partial class CardView : PanelContainer
         _innerRoot = new Control { MouseFilter = MouseFilterEnum.Ignore };
         AddChild(_innerRoot);
 
-        // Layer 0: card art texture (in art_rect 57,97 → 357,537 of source).
+        // Layer 0: card art texture (art_rect 30,70 → 330,510 — 300×440 safe zone).
         _artTex = new TextureRect
         {
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCovered,
             MouseFilter = MouseFilterEnum.Ignore,
         };
-        AnchorBox(_artTex, 57, 97, 357, 537);
+        AnchorBox(_artTex, 30, 70, 330, 510);
         _innerRoot.AddChild(_artTex);
 
         // Art placeholder text (shown when no ArtPath given).
@@ -84,8 +85,8 @@ public partial class CardView : PanelContainer
             Modulate = new Color(0.5f, 0.42f, 0.32f),
             MouseFilter = MouseFilterEnum.Ignore,
         };
-        _artPlaceholder.AddThemeFontSizeOverride("font_size", Mathf.RoundToInt(28 * FrameScale));
-        AnchorBox(_artPlaceholder, 57, 97, 357, 537);
+        _artPlaceholder.AddThemeFontSizeOverride("font_size", Mathf.RoundToInt(22 * FrameScale));
+        AnchorBox(_artPlaceholder, 30, 70, 330, 510);
         _innerRoot.AddChild(_artPlaceholder);
 
         // Layer 1: no-diamond frame texture (full card area). Diamonds rendered as separate layers below.
@@ -98,37 +99,38 @@ public partial class CardView : PanelContainer
         };
         _innerRoot.AddChild(_frameTex);
 
-        // Layer 2: diamonds (140×140 source, center at PNG (70,70)). They protrude past the card body.
+        // Layer 2: diamonds (140×140 source, center at PNG (70,70)). They protrude past the card body
+        // by ~40 src units on the cost (top-left), atk (bottom-left), and hp (bottom-right) corners.
         _diamondCost = MakeDiamondRect();
-        AnchorBox(_diamondCost, -13, -13, 127, 127);   // center at source (57, 57)
+        AnchorBox(_diamondCost, -40, -40, 100, 100);   // center at source (30, 30)
         _innerRoot.AddChild(_diamondCost);
 
         _diamondAtk = MakeDiamondRect();
-        AnchorBox(_diamondAtk, -13, 467, 127, 607);    // center at source (57, 537)
+        AnchorBox(_diamondAtk, -40, 440, 100, 580);    // center at source (30, 510)
         _innerRoot.AddChild(_diamondAtk);
 
         _diamondHp = MakeDiamondRect();
-        AnchorBox(_diamondHp, 287, 467, 427, 607);     // center at source (357, 537)
+        AnchorBox(_diamondHp, 260, 440, 400, 580);     // center at source (330, 510)
         _innerRoot.AddChild(_diamondHp);
 
-        // Layer 3: text overlays. Each label is sized into a box big enough for centered text (incl. 2-digit values)
-        // and positioned so its center equals the source diamond coordinate.
-        _cost = MakeBadgeLabel(36, new Color(1, 1, 1), minPx: 13);
-        AnchorCentered(_cost, 57, 57, halfBox: 38);
+        // Layer 3: text overlays — centered on the diamond / ribbon coordinates.
+        // Source font sizes calibrated for the 360×540 layout (annotation v3).
+        _cost = MakeBadgeLabel(28, new Color(1, 1, 1), minPx: 13);
+        AnchorCentered(_cost, 30, 30, halfBox: 30);
         _innerRoot.AddChild(_cost);
 
-        _name = MakeBadgeLabel(22, new Color(0.95f, 0.88f, 0.7f), minPx: 12, bold: true);
+        _name = MakeBadgeLabel(18, new Color(0.95f, 0.88f, 0.7f), minPx: 11, bold: true);
         _name.AddThemeColorOverride("font_outline_color", new Color(0, 0, 0, 0.85f));
         _name.AddThemeConstantOverride("outline_size", 4);
-        AnchorCentered(_name, 207, 54, halfBoxW: 165, halfBoxH: 22);
+        AnchorCentered(_name, 180, 27, halfBoxW: 150, halfBoxH: 18);
         _innerRoot.AddChild(_name);
 
-        _atk = MakeBadgeLabel(34, new Color(1, 1, 1), minPx: 13);
-        AnchorCentered(_atk, 57, 537, halfBox: 38);
+        _atk = MakeBadgeLabel(26, new Color(1, 1, 1), minPx: 13);
+        AnchorCentered(_atk, 30, 510, halfBox: 30);
         _innerRoot.AddChild(_atk);
 
-        _hp = MakeBadgeLabel(34, new Color(1, 1, 1), minPx: 13);
-        AnchorCentered(_hp, 357, 537, halfBox: 38);
+        _hp = MakeBadgeLabel(26, new Color(1, 1, 1), minPx: 13);
+        AnchorCentered(_hp, 330, 510, halfBox: 30);
         _innerRoot.AddChild(_hp);
 
         // Shield overlay — added last so it draws on top of everything else.
