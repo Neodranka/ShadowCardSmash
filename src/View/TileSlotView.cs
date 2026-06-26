@@ -42,6 +42,9 @@ public partial class TileSlotView : PanelContainer
             BorderWidthLeft = IsTerrain ? 2 : 1,
             BorderWidthRight = IsTerrain ? 2 : 1,
             CornerRadiusTopLeft = 4, CornerRadiusTopRight = 4, CornerRadiusBottomLeft = 4, CornerRadiusBottomRight = 4,
+            // Content margin = the 8px padding around the card. Without this, PanelContainer would
+            // stretch CardView to the full 208×304 tile size, distorting the 2:3 frame aspect.
+            ContentMarginLeft = 8, ContentMarginRight = 8, ContentMarginTop = 8, ContentMarginBottom = 8,
         };
         AddThemeStyleboxOverride("panel", _sb);
     }

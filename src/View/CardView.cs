@@ -116,12 +116,14 @@ public partial class CardView : PanelContainer
         _innerRoot.AddChild(_diamondHp);
 
         // Layer 3a: shield overlays — semi-transparent PNGs covering the card art area.
+        // Ward PNG is opaque-ish by design; dim it heavily via Modulate so it reads as a subtle aura.
         _shieldWard = MakeOverlayRect();
         AnchorBox(_shieldWard, 0, 30, 360, 510);       // 360×480 centered with 30 src margin top/bottom
+        _shieldWard.Modulate = new Color(1f, 1f, 1f, 0.30f);
         _innerRoot.AddChild(_shieldWard);
 
         _shieldBarrier = MakeOverlayRect();
-        AnchorBox(_shieldBarrier, 20, 40, 340, 500);   // 320×460 centered
+        AnchorBox(_shieldBarrier, 20, 40, 340, 500);   // 320×460 centered (user-supplied alpha kept as-is)
         _innerRoot.AddChild(_shieldBarrier);
 
         // Layer 3b: attack-ready icon (storm = can attack hero+minion, rush = minion-only).
