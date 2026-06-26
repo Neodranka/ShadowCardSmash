@@ -33,6 +33,9 @@ public partial class CardView : PanelContainer
     private TextureRect _frameTex = null!;
     private TextureRect _artTex = null!;
     private Label _artPlaceholder = null!;
+    private TextureRect _diamondCost = null!;
+    private TextureRect _diamondAtk = null!;
+    private TextureRect _diamondHp = null!;
     private Label _cost = null!;
     private Label _name = null!;
     private Label _atk = null!;
@@ -85,7 +88,7 @@ public partial class CardView : PanelContainer
         AnchorBox(_artPlaceholder, 57, 97, 357, 537);
         _innerRoot.AddChild(_artPlaceholder);
 
-        // Layer 1: frame texture (full card area).
+        // Layer 1: no-diamond frame texture (full card area). Diamonds rendered as separate layers below.
         _frameTex = new TextureRect
         {
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
@@ -95,7 +98,20 @@ public partial class CardView : PanelContainer
         };
         _innerRoot.AddChild(_frameTex);
 
-        // Layer 2: text overlays. Each label is sized into a box big enough for centered text (incl. 2-digit values)
+        // Layer 2: diamonds (140×140 source, center at PNG (70,70)). They protrude past the card body.
+        _diamondCost = MakeDiamondRect();
+        AnchorBox(_diamondCost, -13, -13, 127, 127);   // center at source (57, 57)
+        _innerRoot.AddChild(_diamondCost);
+
+        _diamondAtk = MakeDiamondRect();
+        AnchorBox(_diamondAtk, -13, 467, 127, 607);    // center at source (57, 537)
+        _innerRoot.AddChild(_diamondAtk);
+
+        _diamondHp = MakeDiamondRect();
+        AnchorBox(_diamondHp, 287, 467, 427, 607);     // center at source (357, 537)
+        _innerRoot.AddChild(_diamondHp);
+
+        // Layer 3: text overlays. Each label is sized into a box big enough for centered text (incl. 2-digit values)
         // and positioned so its center equals the source diamond coordinate.
         _cost = MakeBadgeLabel(36, new Color(1, 1, 1), minPx: 13);
         AnchorCentered(_cost, 57, 57, halfBox: 38);
@@ -129,8 +145,12 @@ public partial class CardView : PanelContainer
         IsOnField = onField;
         _innerRoot.Visible = true;
 
-        // Frame by rarity (frame_bronze / silver / gold / legendary).
+        // No-diamond frame by rarity + separate diamond layers (cost diamond color follows rarity).
         _frameTex.Texture = LoadFrameTexture(script.Rarity);
+        _diamondCost.Texture = LoadDiamondCost(script.Rarity);
+        _diamondAtk.Texture = LoadDiamondAtk();
+        _diamondHp.Texture = LoadDiamondHp();
+        _diamondCost.Visible = true;
 
         // Card art (placeholder when ArtPath is empty/missing).
         var artPath = script.ArtPath;
@@ -175,6 +195,8 @@ public partial class CardView : PanelContainer
             _atk.Visible = false;
             _hp.Visible = false;
         }
+        _diamondAtk.Visible = _atk.Visible;
+        _diamondHp.Visible = _hp.Visible;
 
         // Silence dims the whole card.
         Modulate = (onField && card.IsSilenced) ? new Color(0.55f, 0.55f, 0.55f) : new Color(1, 1, 1);
@@ -202,18 +224,44 @@ public partial class CardView : PanelContainer
         Card = CardId.None;
         IsOnField = false;
         _innerRoot.Visible = false;
-        // Reuse the bronze frame as the universal "card back" without overlays.
+        // Reuse the bronze no-diamond frame as the universal "card back" without overlays.
         // A dedicated card-back PNG can replace this later.
         _frameTex.Texture = LoadFrameTexture(Rarity.Bronze);
+        _diamondCost.Visible = false;
+        _diamondAtk.Visible = false;
+        _diamondHp.Visible = false;
         Modulate = new Color(0.35f, 0.32f, 0.45f);
         TooltipText = "对手手牌";
     }
 
     private static Texture2D? LoadFrameTexture(Rarity rarity)
     {
-        var path = $"res://art/ui/cards/frame_{rarity.ToString().ToLower()}.png";
+        // Uses no-diamond frames; diamonds are rendered as separate TextureRect layers above.
+        var path = $"res://art/ui/cards/frame_{rarity.ToString().ToLower()}_nd.png";
         return ResourceLoader.Exists(path) ? GD.Load<Texture2D>(path) : null;
     }
+
+    private static Texture2D? LoadDiamondCost(Rarity rarity)
+    {
+        var path = $"res://art/ui/cards/diamond_cost_{rarity.ToString().ToLower()}.png";
+        return ResourceLoader.Exists(path) ? GD.Load<Texture2D>(path) : null;
+    }
+
+    private static Texture2D? _diamondAtkCache;
+    private static Texture2D? _diamondHpCache;
+    private static Texture2D? LoadDiamondAtk()
+        => _diamondAtkCache ??= ResourceLoader.Exists("res://art/ui/cards/diamond_atk.png")
+            ? GD.Load<Texture2D>("res://art/ui/cards/diamond_atk.png") : null;
+    private static Texture2D? LoadDiamondHp()
+        => _diamondHpCache ??= ResourceLoader.Exists("res://art/ui/cards/diamond_hp.png")
+            ? GD.Load<Texture2D>("res://art/ui/cards/diamond_hp.png") : null;
+
+    private static TextureRect MakeDiamondRect() => new()
+    {
+        ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+        StretchMode = TextureRect.StretchModeEnum.Scale,
+        MouseFilter = MouseFilterEnum.Ignore,
+    };
 
     private static Label MakeBadgeLabel(int srcFontSize, Color color, int minPx = 10, bool bold = false)
     {
