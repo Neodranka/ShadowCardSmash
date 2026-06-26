@@ -16,8 +16,10 @@ public partial class BoardView : Control
 {
     public const int Margin = 16;
     public const int RowSeparation = 4;
-    // Tile row width = 6 slots * slot-width + 5 separations; info bars constrain themselves to this width.
-    public const int TileRowWidth = PlayerState.FieldSize * TileSlotView.Width + (PlayerState.FieldSize - 1) * 8;
+    // Tight separations so 6 large tiles + terrain + flanks fit a 1920-wide viewport.
+    public const int TileSeparation = 4;
+    public const int TerrainGap = 4;
+    public const int TileRowWidth = PlayerState.FieldSize * TileSlotView.Width + (PlayerState.FieldSize - 1) * TileSeparation;
 
     [Signal] public delegate void HandCardClickedEventHandler(int sideIndex, int instanceId);
     [Signal] public delegate void HandStripClickedEventHandler(int sideIndex);
@@ -155,10 +157,10 @@ public partial class BoardView : Control
     }
 
     /// <summary>
-    /// Build one player's section HBox: left flank | spacer | middle (info + hand + field) | spacer | right flank.
-    /// Info bar sits at the outer edge of the middle column so it lines up with hand/field, no side spacers.
-    /// Top side: info → hand → field, flank cells stack placeholder ↑ then deck/grave ↓ (deck/grave near HSep).
-    /// Bottom side: field → hand → info, flank cells stack deck/grave ↑ then placeholder ↓ (deck/grave near HSep).
+    /// Build one player's section HBox: left flank | spacer | middle (info + hand-row + field) | spacer | right flank.
+    /// The hand-row itself is HBox: [EvolveButton | HandView peek] so the evolve button now occupies
+    /// the empty space to the left of the peek hand strip (matching its 84px height).
+    /// Top side: info → hand-row → field. Bottom side: field → hand-row → info.
     /// </summary>
     private TileSlotView[] BuildPlayerSection(
         Container parent, bool isTopSide,
@@ -168,7 +170,7 @@ public partial class BoardView : Control
         out TileSlotView terrainSlot, out EvolutionButton evolveButton)
     {
         var section = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        section.AddThemeConstantOverride("separation", 8);
+        section.AddThemeConstantOverride("separation", 4);
         parent.AddChild(section);
 
         // Left flank column.
@@ -180,27 +182,36 @@ public partial class BoardView : Control
 
         section.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
 
-        // Middle column: info + hand + field (or field + hand + info for bottom side).
+        // Middle column: info + hand-row + field (or field + hand-row + info for bottom side).
         var middle = new VBoxContainer
         {
             CustomMinimumSize = new Vector2(TileRowWidth, 0),
             SizeFlagsHorizontal = SizeFlags.ShrinkCenter,
         };
         middle.AddThemeConstantOverride("separation", RowSeparation);
-        var tiles = new TileSlotView[PlayerState.FieldSize];
-        var fieldRow = BuildBareFieldRow(tiles, out terrainSlot, out evolveButton);
-        var capturedButton = evolveButton;
+
+        // Evolve button + peek hand strip composed horizontally.
+        evolveButton = new EvolutionButton();
         evolveButton.EvolveButtonClicked += sideIdx => EmitSignal(SignalName.EvolveButtonClicked, sideIdx);
+        var handRow = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        handRow.AddThemeConstantOverride("separation", 8);
+        handRow.AddChild(evolveButton);
+        handView.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        handRow.AddChild(handView);
+
+        var tiles = new TileSlotView[PlayerState.FieldSize];
+        var fieldRow = BuildBareFieldRow(tiles, out terrainSlot);
+
         if (isTopSide)
         {
             middle.AddChild(infoPanel);
-            middle.AddChild(handView);
+            middle.AddChild(handRow);
             middle.AddChild(fieldRow);
         }
         else
         {
             middle.AddChild(fieldRow);
-            middle.AddChild(handView);
+            middle.AddChild(handRow);
             middle.AddChild(infoPanel);
         }
         section.AddChild(middle);
@@ -217,15 +228,10 @@ public partial class BoardView : Control
         return tiles;
     }
 
-    private HBoxContainer BuildBareFieldRow(TileSlotView[] tilesOut, out TileSlotView terrainOut, out EvolutionButton evolveOut)
+    private HBoxContainer BuildBareFieldRow(TileSlotView[] tilesOut, out TileSlotView terrainOut)
     {
         var row = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ShrinkCenter };
-        row.AddThemeConstantOverride("separation", 8);
-
-        // Left edge: evolution button (mirror of terrain on the right).
-        evolveOut = new EvolutionButton();
-        row.AddChild(evolveOut);
-        row.AddChild(new Control { CustomMinimumSize = new Vector2(24, 0) });
+        row.AddThemeConstantOverride("separation", TileSeparation);
 
         for (int i = 0; i < PlayerState.FieldSize; i++)
         {
@@ -235,8 +241,8 @@ public partial class BoardView : Control
             tilesOut[i] = tile;
         }
 
-        // Right edge: dedicated terrain slot with a distinct (amber) border.
-        row.AddChild(new Control { CustomMinimumSize = new Vector2(24, 0) });
+        // Right edge: dedicated terrain slot with a distinct (amber) border, separated by a small gap.
+        row.AddChild(new Control { CustomMinimumSize = new Vector2(TerrainGap, 0) });
         terrainOut = new TileSlotView { TileIndex = PlayerState.TerrainSlotIndex, IsTerrain = true };
         var capturedTerrain = terrainOut;
         terrainOut.TileClicked += idx => EmitSignal(SignalName.TileClicked, (int)capturedTerrain.Side, idx);

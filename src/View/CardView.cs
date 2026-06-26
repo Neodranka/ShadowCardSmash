@@ -13,8 +13,8 @@ namespace ShadowCardSmash.View;
 /// </summary>
 public partial class CardView : PanelContainer
 {
-    public const int CardWidth = 160;
-    public const int CardHeight = 232;
+    public const int CardWidth = 216;
+    public const int CardHeight = 314;
 
     // Source design constants (414×594) — labels scale per FrameScale but minimum font sizes enforced.
     private const float SrcW = 414f;

@@ -4,14 +4,15 @@ using ShadowCardSmash.Domain;
 namespace ShadowCardSmash.View;
 
 /// <summary>
-/// Tile-sized button used to spend an Evolution Point. Visualizes EP as a horizontal segmented bar:
-/// remaining segments lit yellow, spent ones dark. A label overlays the bar with status text.
-/// Sits to the left of the 6 field tiles, mirroring the terrain slot on the right.
+/// Compact strip button used to spend an Evolution Point. Visualizes EP as 3 vertical bars
+/// (horizontally split / "横向分割") with remaining segments lit yellow and spent ones dark.
+/// A label overlays the bar with status text. Sits to the left of the hand peek strip,
+/// matching the hand strip's height.
 /// </summary>
 public partial class EvolutionButton : PanelContainer
 {
-    public const int Width = TileSlotView.Width;
-    public const int Height = TileSlotView.Height;
+    public const int Width = 110;
+    public const int Height = HandView.PeekStripHeight;
 
     [Signal] public delegate void EvolveButtonClickedEventHandler(int sideIndex);
 
@@ -29,7 +30,7 @@ public partial class EvolutionButton : PanelContainer
     }
 
     private Control _stack = null!;
-    private VBoxContainer _bar = null!;
+    private HBoxContainer _bar = null!;
     private Label _label = null!;
     private StyleBoxFlat _sb = null!;
     private bool _builtUi;
@@ -59,7 +60,7 @@ public partial class EvolutionButton : PanelContainer
         _stack = new Control { MouseFilter = MouseFilterEnum.Ignore };
         AddChild(_stack);
 
-        _bar = new VBoxContainer
+        _bar = new HBoxContainer
         {
             AnchorRight = 1, AnchorBottom = 1,
             MouseFilter = MouseFilterEnum.Ignore,
@@ -75,7 +76,7 @@ public partial class EvolutionButton : PanelContainer
             Text = "进化",
             MouseFilter = MouseFilterEnum.Ignore,
         };
-        _label.AddThemeFontSizeOverride("font_size", 20);
+        _label.AddThemeFontSizeOverride("font_size", 16);
         _label.AddThemeColorOverride("font_outline_color", new Color(0, 0, 0));
         _label.AddThemeConstantOverride("outline_size", 4);
         _stack.AddChild(_label);
