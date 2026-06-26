@@ -35,6 +35,8 @@ public partial class HandView : Control
     private const float HoverLift = 30f;              // px upward on hover
     private const float HoverTweenSec = 0.12f;
     private const int HoverZIndex = 100;
+    private const float ExpandTweenSec = 0.22f;       // per-card slide+rotate duration
+    private const float ExpandStaggerSec = 0.03f;     // delay between consecutive card animations
 
     // One running tween per card (keyed by instance id) so spamming hover doesn't stack tweens.
     private readonly Dictionary<ulong, Tween> _hoverTweens = new();
@@ -98,7 +100,6 @@ public partial class HandView : Control
             // Rotate around card center so the visual "splay" pivots cleanly.
             cv.PivotOffset = new Vector2(cardW / 2f, cardH / 2f);
             var basePos = new Vector2(startX + i * step, 0);
-            cv.Position = basePos;
             cv.ZIndex = i; // rightmost on top
             int baseZ = i;
 
@@ -108,7 +109,22 @@ public partial class HandView : Control
                 float t = (float)i / (_cardsCache.Count - 1);
                 baseRotRad = Mathf.DegToRad(Mathf.Lerp(-FanAngleDeg, FanAngleDeg, t));
             }
-            cv.Rotation = baseRotRad;
+
+            if (fan)
+            {
+                // Start collapsed at peek-strip height + center, fade in, then tween out to fanned target.
+                float startY = Math.Max(0f, Size.Y - cardH);
+                float centerX = Size.X / 2f - cardW / 2f;
+                cv.Position = new Vector2(centerX, startY);
+                cv.Rotation = 0f;
+                cv.Modulate = new Color(1, 1, 1, 0f);
+                TweenExpand(cv, basePos, baseRotRad, i * ExpandStaggerSec);
+            }
+            else
+            {
+                cv.Position = basePos;
+                cv.Rotation = baseRotRad;
+            }
 
             if (Mode == DisplayMode.Peek)
             {
@@ -144,6 +160,22 @@ public partial class HandView : Control
         t.Parallel().TweenProperty(cv, "rotation", targetRot, HoverTweenSec);
         _hoverTweens[id] = t;
         cv.ZIndex = targetZ;
+    }
+
+    /// <summary>Initial fan-out animation when the HandPopup opens — cards slide+rotate from a
+    /// collapsed center-bottom stack into their fanned target, staggered by card index.</summary>
+    private void TweenExpand(CardView cv, Vector2 targetPos, float targetRot, float delaySec)
+    {
+        var id = cv.GetInstanceId();
+        if (_hoverTweens.TryGetValue(id, out var prev) && GodotObject.IsInstanceValid(prev))
+            prev.Kill();
+        var t = cv.CreateTween();
+        t.SetEase(Tween.EaseType.Out).SetTrans(Tween.TransitionType.Cubic);
+        if (delaySec > 0f) t.TweenInterval(delaySec);
+        t.TweenProperty(cv, "position", targetPos, ExpandTweenSec);
+        t.Parallel().TweenProperty(cv, "rotation", targetRot, ExpandTweenSec);
+        t.Parallel().TweenProperty(cv, "modulate:a", 1f, ExpandTweenSec * 0.8f);
+        _hoverTweens[id] = t;
     }
 
     private void OnStripBackgroundInput(InputEvent e)
