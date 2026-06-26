@@ -76,10 +76,11 @@ public partial class HandView : Control
 
         int cardW = CardView.CardWidth;
         int cardH = CardView.CardHeight;
-        // Peek: heavy overlap; Full: wider step so rotated corners don't crowd.
+        // Peek: heavy overlap (32% step). Full fan: 20% right-side overlap → step = 80% of card width.
+        // ZIndex = i already makes the right (higher index) card draw on top of the left (lower index) card.
         int step = Mode == DisplayMode.Peek
             ? (int)(cardW * 0.32f)
-            : cardW + 24;
+            : (int)(cardW * 0.80f);
         int totalWidth = (_cardsCache.Count - 1) * step + cardW;
         float startX = Math.Max(0f, ((float)Size.X - totalWidth) / 2f);
 
