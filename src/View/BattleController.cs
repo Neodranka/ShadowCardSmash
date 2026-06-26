@@ -228,6 +228,13 @@ public partial class BattleController : Node
                     }
                     if (script.PlayTarget != TargetSpec.None && _pendingTileIndex is null)
                     {
+                        // No valid targets on board → skip the target-pick sub-state and play directly.
+                        // OnPlay sees PickedTarget=null and exits early (规则：算作未触发开幕).
+                        if (!HasAnyValidTarget(script.PlayTarget))
+                        {
+                            TrySubmit(new PlayCardAction(LocalSide, _selectedHandInstance, tileIndex, null, null));
+                            return;
+                        }
                         // 还需要选 target：先把 tile 存起来，进入"等待目标"子阶段。
                         _pendingTileIndex = tileIndex;
                         _targetsNeeded = Math.Max(1, script.TargetsToPick);
@@ -577,6 +584,27 @@ public partial class BattleController : Node
         => await ToSignal(GetTree().CreateTimer(seconds), SceneTreeTimer.SignalName.Timeout);
 
     private void Rebind() => _board.Rebind(_loop.State, _registry, LocalSide);
+
+    /// <summary>
+    /// True iff the current board state contains at least one entity matching the given TargetSpec.
+    /// Used to skip the target-pick UI when a card's effect has no possible target.
+    /// </summary>
+    private bool HasAnyValidTarget(TargetSpec spec)
+    {
+        var me = _loop.State.GetPlayer(LocalSide);
+        var enemy = _loop.State.GetPlayer(LocalSide.Opponent());
+        return spec switch
+        {
+            TargetSpec.SingleAllyMinion     => me.Field.Any(t => t.Occupant is not null),
+            TargetSpec.SingleEnemyMinion    => enemy.Field.Any(t => t.Occupant is not null),
+            TargetSpec.SingleAnyMinion      => me.Field.Any(t => t.Occupant is not null)
+                                            || enemy.Field.Any(t => t.Occupant is not null),
+            TargetSpec.EmptyAllyTile        => me.Field.Any(t => t.Occupant is null),
+            TargetSpec.EmptyEnemyTile       => enemy.Field.Any(t => t.Occupant is null),
+            // Characters always include heroes — never empty.
+            _ => true,
+        };
+    }
 
     private void ResetMode()
     {
