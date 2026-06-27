@@ -35,7 +35,7 @@ public partial class MainMenuController : Control
         vb.AddChild(new Control { CustomMinimumSize = new Vector2(0, 32) });
 
         AddButton(vb, "Hot Seat", OnHotSeat);
-        AddButton(vb, "Multiplayer (TODO)", () => { }, disabled: true);
+        AddButton(vb, "Multiplayer (联机)", OnMultiplayer);
         AddButton(vb, "Network Test (Dev)", OnNetworkTest);
         AddButton(vb, "Deck Builder", OnDeckBuilder);
         AddButton(vb, "Quit", () => GetTree().Quit());
@@ -66,5 +66,10 @@ public partial class MainMenuController : Control
     private void OnNetworkTest()
     {
         GetTree().ChangeSceneToFile("res://scenes/NetworkTest.tscn");
+    }
+
+    private void OnMultiplayer()
+    {
+        GetTree().ChangeSceneToFile("res://scenes/MultiplayerLobby.tscn");
     }
 }

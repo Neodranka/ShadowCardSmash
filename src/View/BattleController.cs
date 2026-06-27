@@ -21,7 +21,9 @@ namespace ShadowCardSmash.View;
 /// </summary>
 public partial class BattleController : Node
 {
-    private GameLoop _loop = null!;
+    // Host modes (Hotseat / NetHost) own a real GameLoop; client mode leaves this null and reads state
+    // via _netSession.State (mirror replaced wholesale on each ActionApplied).
+    private GameLoop? _loop;
     private CardRegistry _registry = null!;
     private BoardView _board = null!;
 
@@ -45,7 +47,17 @@ public partial class BattleController : Node
     // loopback flavor (no transport) so the data flow matches networked mode exactly.
     private NetSession _netSession = null!;
 
-    public PlayerSide LocalSide => _loop.State.CurrentPlayer; // hot-seat: always view current player
+    // In hotseat, LocalSide auto-follows whoever's turn it is (shared screen). In net modes the local
+    // player is fixed to one side (host=First, client=Second).
+    private PlayerSide _fixedLocalSide;
+    private bool _hasFixedLocalSide;
+
+    public PlayerSide LocalSide =>
+        _hasFixedLocalSide ? _fixedLocalSide : _netSession.State.CurrentPlayer;
+
+    // Convenience accessors so every UI handler reads through NetSession (works on host AND client).
+    private GameState State => _netSession.State;
+    private bool IsGameOver => _netSession.State.Result != GameResult.InProgress;
 
     public override void _Ready()
     {
@@ -65,7 +77,48 @@ public partial class BattleController : Node
         _board.EvolveButtonClicked += OnEvolveButtonClicked;
         _board.HandStripClicked += OnHandStripClicked;
 
-        StartHotSeatGame();
+        switch (BattleSetup.Mode)
+        {
+            case BattleMode.Hotseat:   StartHotSeatGame(); break;
+            case BattleMode.NetHost:   StartNetHostGame(); break;
+            case BattleMode.NetClient: StartNetClientGame(); break;
+        }
+    }
+
+    public override void _ExitTree()
+    {
+        if (BattleSetup.NetTransport != null && GodotObject.IsInstanceValid(BattleSetup.NetTransport))
+        {
+            BattleSetup.NetTransport.Stop();
+            BattleSetup.NetTransport.QueueFree();
+        }
+        BattleSetup.ClearNetHandoff();
+    }
+
+    private void StartNetHostGame()
+    {
+        _loop = BattleSetup.PendingHostLoop ?? throw new InvalidOperationException("NetHost requires PendingHostLoop");
+        var transport = BattleSetup.NetTransport ?? throw new InvalidOperationException("NetHost requires NetTransport");
+        _fixedLocalSide = BattleSetup.NetLocalSide;
+        _hasFixedLocalSide = true;
+        _netSession = NetSession.CreateNetHost(_loop, transport, _fixedLocalSide);
+        _netSession.ActionApplied += OnActionApplied;
+        _netSession.ActionRejected += OnActionRejected;
+        // Loop is already past mulligan (lobby ran them). Just bind UI to current state.
+        Rebind();
+    }
+
+    private void StartNetClientGame()
+    {
+        var transport = BattleSetup.NetTransport ?? throw new InvalidOperationException("NetClient requires NetTransport");
+        var initial = BattleSetup.NetInitialState ?? throw new InvalidOperationException("NetClient requires NetInitialState");
+        _fixedLocalSide = BattleSetup.NetLocalSide;
+        _hasFixedLocalSide = true;
+        _loop = null; // client has no authoritative loop
+        _netSession = NetSession.CreateNetClient(transport, _fixedLocalSide, initial);
+        _netSession.ActionApplied += OnActionApplied;
+        _netSession.ActionRejected += OnActionRejected;
+        Rebind();
     }
 
     private (IReadOnlyList<CardId> Cards, HeroClass HeroClass) ResolveSeat(DeckResource? deck, HeroClass fallbackClass)
@@ -115,9 +168,9 @@ public partial class BattleController : Node
     {
         if (_isAnimating) return;
         var side = (PlayerSide)sideIndex;
-        if (side != LocalSide || _loop.IsGameOver) return;
+        if (side != LocalSide || IsGameOver) return;
 
-        var card = _loop.State.GetPlayer(side).Hand.FirstOrDefault(c => c.Instance.Value == instanceId);
+        var card = State.GetPlayer(side).Hand.FirstOrDefault(c => c.Instance.Value == instanceId);
         if (card is null) return;
         var script = _registry.Get(card.Card);
 
@@ -221,7 +274,7 @@ public partial class BattleController : Node
 
     private void OnTileClicked(int sideIndex, int tileIndex)
     {
-        if (_isAnimating || _loop.IsGameOver) return;
+        if (_isAnimating || IsGameOver) return;
         var side = (PlayerSide)sideIndex;
 
         if (_mode == Mode.AwaitPlayTarget)
@@ -258,7 +311,7 @@ public partial class BattleController : Node
                 case CardType.Spell:
                     // V1: spells don't target the terrain slot (terrain isn't a regular minion).
                     if (tileIndex == PlayerState.TerrainSlotIndex) return;
-                    if (_loop.State.GetPlayer(side).Field[tileIndex].Occupant is { } occ)
+                    if (State.GetPlayer(side).Field[tileIndex].Occupant is { } occ)
                         TrySubmit(new PlayCardAction(LocalSide, _selectedHandInstance, null, occ.Instance, null));
                     return;
             }
@@ -268,7 +321,7 @@ public partial class BattleController : Node
 
     private void OnMinionClicked(int sideIndex, int instanceId)
     {
-        if (_isAnimating || _loop.IsGameOver) return;
+        if (_isAnimating || IsGameOver) return;
         var side = (PlayerSide)sideIndex;
         var instance = new InstanceId(instanceId);
 
@@ -302,7 +355,7 @@ public partial class BattleController : Node
         if (_mode == Mode.AwaitEvolveTarget)
         {
             if (side != LocalSide) { _board.SetStatus("只能进化己方随从"); return; }
-            var target = _loop.State.GetPlayer(side).FindOnField(instance);
+            var target = State.GetPlayer(side).FindOnField(instance);
             if (target is null || target.IsEvolved) { _board.SetStatus("无法进化此随从"); return; }
             TrySubmit(new EvolveAction(LocalSide, instance));
             return;
@@ -310,7 +363,7 @@ public partial class BattleController : Node
 
         if (side == LocalSide)
         {
-            var attacker = _loop.State.GetPlayer(side).FindOnField(instance);
+            var attacker = State.GetPlayer(side).FindOnField(instance);
             if (attacker is null) return;
 
             string? blocker = DiagnoseAttackBlocker(attacker);
@@ -318,7 +371,7 @@ public partial class BattleController : Node
 
             _selectedAttacker = instance;
             _mode = Mode.AwaitAttackTarget;
-            _board.SetStatus((CombatResolver.EnemyHasWard(_loop.State, LocalSide)
+            _board.SetStatus((CombatResolver.EnemyHasWard(State, LocalSide)
                 ? "对方有守护，必须先攻击守护随从"
                 : "选择攻击目标（敌方随从或英雄）") + "  右键/Esc 取消");
             _board.PinDetail(instance);
@@ -327,7 +380,7 @@ public partial class BattleController : Node
 
     private void OnHeroClicked(int sideIndex)
     {
-        if (_isAnimating || _loop.IsGameOver) return;
+        if (_isAnimating || IsGameOver) return;
         var side = (PlayerSide)sideIndex;
 
         if (_mode == Mode.AwaitAttackTarget && side == LocalSide.Opponent())
@@ -346,15 +399,15 @@ public partial class BattleController : Node
 
     private void OnEndTurnClicked()
     {
-        if (_isAnimating || _loop.IsGameOver) return;
-        if (_loop.State.Phase != GamePhase.Main) return;
+        if (_isAnimating || IsGameOver) return;
+        if (State.Phase != GamePhase.Main) return;
         ResetMode();
         TrySubmit(new EndTurnAction(LocalSide));
     }
 
     private void OnHandStripClicked(int sideIndex)
     {
-        if (_isAnimating || _loop.IsGameOver) return;
+        if (_isAnimating || IsGameOver) return;
         var side = (PlayerSide)sideIndex;
         if (side != LocalSide) return;
         // If we're already in some selection mode, ignore (player should finish or cancel first).
@@ -363,7 +416,7 @@ public partial class BattleController : Node
 
         var popup = new HandPopup();
         AddChild(popup);
-        var me = _loop.State.GetPlayer(LocalSide);
+        var me = State.GetPlayer(LocalSide);
         popup.Populate(me.Hand, _registry, me.Mana, LocalSide);
         _board.MyHand.Visible = false;
         popup.CardSelected += iid =>
@@ -390,10 +443,10 @@ public partial class BattleController : Node
 
     private void OnEvolveButtonClicked(int sideIndex)
     {
-        if (_isAnimating || _loop.IsGameOver) return;
+        if (_isAnimating || IsGameOver) return;
         var side = (PlayerSide)sideIndex;
         if (side != LocalSide) return;
-        if (!EvolutionSystem.CanManuallyEvolve(_loop.State, LocalSide))
+        if (!EvolutionSystem.CanManuallyEvolve(State, LocalSide))
         {
             _board.SetStatus("EP 不足或本回合已进化过");
             return;
@@ -412,7 +465,7 @@ public partial class BattleController : Node
         if (_isAnimating) return;
         var side = (PlayerSide)sideIndex;
         var kind = (PileView.Kind)kindIndex;
-        var p = _loop.State.GetPlayer(side);
+        var p = State.GetPlayer(side);
 
         IReadOnlyList<RuntimeCard> cards;
         string title;
@@ -591,7 +644,7 @@ public partial class BattleController : Node
     private async Task SmallDelay(double seconds)
         => await ToSignal(GetTree().CreateTimer(seconds), SceneTreeTimer.SignalName.Timeout);
 
-    private void Rebind() => _board.Rebind(_loop.State, _registry, LocalSide);
+    private void Rebind() => _board.Rebind(State, _registry, LocalSide);
 
     /// <summary>
     /// True iff the current board state contains at least one entity matching the given TargetSpec.
@@ -599,8 +652,8 @@ public partial class BattleController : Node
     /// </summary>
     private bool HasAnyValidTarget(TargetSpec spec)
     {
-        var me = _loop.State.GetPlayer(LocalSide);
-        var enemy = _loop.State.GetPlayer(LocalSide.Opponent());
+        var me = State.GetPlayer(LocalSide);
+        var enemy = State.GetPlayer(LocalSide.Opponent());
         return spec switch
         {
             TargetSpec.SingleAllyMinion     => me.Field.Any(t => t.Occupant is not null),
@@ -666,7 +719,7 @@ public partial class BattleController : Node
     private void HighlightFriendlyEmptyTiles()
     {
         var tiles = _board.MyTiles;
-        var p = _loop.State.GetPlayer(LocalSide);
+        var p = State.GetPlayer(LocalSide);
         for (int i = 0; i < tiles.Length; i++) tiles[i].Highlight(p.Field[i].IsEmpty);
     }
 

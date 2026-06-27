@@ -160,6 +160,20 @@ public class NetMessageJsonTests
         Assert.IsType<EndTurnAction>(clone.Action);
     }
 
+    [Fact]
+    public void StartGame_RoundTrip_WithEmbeddedState()
+    {
+        var state = BuildSmallState();
+        var msg = new StartGame(state, ClientSide: PlayerSide.Second);
+        AssertRoundTrip(msg, "StartGame");
+
+        var clone = (StartGame)NetMessageJson.Deserialize(NetMessageJson.Serialize(msg));
+        Assert.Equal(PlayerSide.Second, clone.ClientSide);
+        Assert.Equal(state.TurnNumber, clone.InitialState.TurnNumber);
+        Assert.Equal(state.CurrentPlayer, clone.InitialState.CurrentPlayer);
+        Assert.Equal(state.GetPlayer(PlayerSide.First).Health, clone.InitialState.GetPlayer(PlayerSide.First).Health);
+    }
+
     private static GameState BuildSmallState()
     {
         var s = new GameState

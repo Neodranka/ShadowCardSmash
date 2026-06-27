@@ -22,6 +22,7 @@ namespace ShadowCardSmash.Net;
 [JsonDerivedType(typeof(ActionRequest),     "ActionRequest")]
 [JsonDerivedType(typeof(ActionApplied),     "ActionApplied")]
 [JsonDerivedType(typeof(ActionRejected),    "ActionRejected")]
+[JsonDerivedType(typeof(StartGame),         "StartGame")]
 public abstract record NetMessage;
 
 /// <summary>Client → Host: initial connection handshake. Host validates ProtocolVersion and assigns a side.</summary>
@@ -54,3 +55,8 @@ public sealed record ActionApplied(
 /// <summary>Host → originating client: "your action failed validation". Empty for host's own actions
 /// (host validates locally before broadcasting; it never rejects itself).</summary>
 public sealed record ActionRejected(long ClientRequestId, IGameAction Action, string Reason) : NetMessage;
+
+/// <summary>Host → Client: "battle is starting, here is the initial state, you play this side".
+/// Sent after lobby handshake completes and host runs GameInitializer + mulligans locally.
+/// Client uses this to seed its mirror state and transition to the Battle scene.</summary>
+public sealed record StartGame(GameState InitialState, PlayerSide ClientSide) : NetMessage;
