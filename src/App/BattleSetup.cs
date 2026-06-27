@@ -34,12 +34,16 @@ public static class BattleSetup
     /// <summary>Host-only: live GameLoop built in lobby (already past mulligan). BattleController takes ownership.</summary>
     public static GameLoop? PendingHostLoop;
 
+    /// <summary>Session token agreed at handshake. Phase 6: stored for Phase 7 reconnect handshake.</summary>
+    public static System.Guid? NetSessionToken;
+
     /// <summary>Clear all net handoff fields after BattleController consumes them.</summary>
     public static void ClearNetHandoff()
     {
         NetTransport = null;
         NetInitialState = null;
         PendingHostLoop = null;
+        NetSessionToken = null;
         Mode = BattleMode.Hotseat;
     }
 }

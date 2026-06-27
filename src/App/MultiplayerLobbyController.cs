@@ -268,6 +268,7 @@ public partial class MultiplayerLobbyController : Control
                 }
                 _handshakeComplete = true;
                 var token = Guid.NewGuid();
+                BattleSetup.NetSessionToken = token; // host stores own copy for Phase 7 reconnect
                 _transport.Send(fromId, new HandshakeAccepted(token, PlayerSide.Second));
                 Log($"[send → {fromId}] HandshakeAccepted (client assigned Second)");
                 UpdateStatus("握手完成 — 点击 Start Game 开始对局");
@@ -278,6 +279,7 @@ public partial class MultiplayerLobbyController : Control
                 Log($"[recv ← {fromId}] HandshakeAccepted(side={accept.AssignedSide})");
                 _handshakeComplete = true;
                 _assignedSide = accept.AssignedSide;
+                BattleSetup.NetSessionToken = accept.SessionToken; // client persists for Phase 7 reconnect
                 UpdateStatus($"握手完成 — 你的位置：{accept.AssignedSide}。等待主机开始游戏...");
                 break;
 

@@ -104,6 +104,7 @@ public partial class BattleController : Node
         _netSession = NetSession.CreateNetHost(_loop, transport, _fixedLocalSide);
         _netSession.ActionApplied += OnActionApplied;
         _netSession.ActionRejected += OnActionRejected;
+        _netSession.PeerDisconnected += OnNetPeerDisconnected;
         GD.Print($"[Battle] NetHost initialized, localSide={_fixedLocalSide}, transport.IsRunning={transport.IsRunning}");
         Rebind();
     }
@@ -118,8 +119,79 @@ public partial class BattleController : Node
         _netSession = NetSession.CreateNetClient(transport, _fixedLocalSide, initial);
         _netSession.ActionApplied += OnActionApplied;
         _netSession.ActionRejected += OnActionRejected;
+        _netSession.PeerDisconnected += OnNetPeerDisconnected;
         GD.Print($"[Battle] NetClient initialized, localSide={_fixedLocalSide}, transport={transport.IsRunning}, initialTurn={initial.TurnNumber}, currentPlayer={initial.CurrentPlayer}");
         Rebind();
+    }
+
+    // ---- Phase 6: disconnect grace ----
+
+    /// <summary>Seconds the disconnected peer has to reconnect before this peer declares forfeit (Phase 7
+    /// adds the actual reconnect; for now timeout always ends the game).</summary>
+    private const double DisconnectGraceSeconds = 60.0;
+
+    private bool _netPaused;
+    private double _graceRemaining;
+    private Control? _pauseOverlay;
+    private Label? _pauseLabel;
+    private Button? _pauseBackBtn;
+
+    private void OnNetPeerDisconnected()
+    {
+        if (_netPaused) return; // already showing grace overlay
+        _netPaused = true;
+        _graceRemaining = DisconnectGraceSeconds;
+        GD.Print($"[Battle] NetPeerDisconnected — entering {DisconnectGraceSeconds}s grace");
+        BuildPauseOverlay();
+        RefreshPauseLabel();
+    }
+
+    private void BuildPauseOverlay()
+    {
+        if (_pauseOverlay != null) return;
+        // Full-screen dim that absorbs all mouse input (MouseFilter.Stop) — this alone is enough to
+        // gate UI handlers without per-handler `_netPaused` checks.
+        _pauseOverlay = new ColorRect
+        {
+            Color = new Color(0, 0, 0, 0.72f),
+            AnchorRight = 1, AnchorBottom = 1,
+            MouseFilter = Control.MouseFilterEnum.Stop,
+            ZIndex = 200,
+        };
+        AddChild(_pauseOverlay);
+
+        var center = new CenterContainer { AnchorRight = 1, AnchorBottom = 1 };
+        _pauseOverlay.AddChild(center);
+        var vb = new VBoxContainer();
+        vb.AddThemeConstantOverride("separation", 18);
+        center.AddChild(vb);
+
+        _pauseLabel = new Label { HorizontalAlignment = HorizontalAlignment.Center, Text = "" };
+        _pauseLabel.AddThemeFontSizeOverride("font_size", 30);
+        _pauseLabel.Modulate = new Color(1f, 0.95f, 0.7f);
+        vb.AddChild(_pauseLabel);
+
+        _pauseBackBtn = new Button { Text = "返回主菜单", CustomMinimumSize = new Vector2(200, 44), Visible = false };
+        _pauseBackBtn.Pressed += () => GetTree().ChangeSceneToFile("res://scenes/MainMenu.tscn");
+        vb.AddChild(_pauseBackBtn);
+    }
+
+    private void RefreshPauseLabel()
+    {
+        if (_pauseLabel == null) return;
+        if (_graceRemaining > 0)
+            _pauseLabel.Text = $"对方断线 — {(int)Math.Ceiling(_graceRemaining)} 秒后判负";
+        else
+            _pauseLabel.Text = "对方失联，对局结束";
+        if (_pauseBackBtn != null) _pauseBackBtn.Visible = _graceRemaining <= 0;
+    }
+
+    public override void _Process(double delta)
+    {
+        if (!_netPaused || _graceRemaining <= 0) return;
+        _graceRemaining -= delta;
+        if (_graceRemaining < 0) _graceRemaining = 0;
+        RefreshPauseLabel();
     }
 
     private (IReadOnlyList<CardId> Cards, HeroClass HeroClass) ResolveSeat(DeckResource? deck, HeroClass fallbackClass)

@@ -45,6 +45,11 @@ public sealed class NetSession
     /// <summary>Fires when an action this peer submitted was rejected by the host (validation failure).</summary>
     public event Action<ActionRejected>? ActionRejected;
 
+    /// <summary>Forwarded from the underlying transport. In V1 1v1 this means the game-pair peer dropped
+    /// — host's only client, or client's server. UI uses this to start the disconnect-grace timer.
+    /// Never fires in HotseatLoopback (no transport).</summary>
+    public event Action? PeerDisconnected;
+
     private readonly GameLoop? _hostLoop;
     private GameState _clientMirror = new();
     private readonly INetTransport? _transport;
@@ -57,7 +62,11 @@ public sealed class NetSession
         _hostLoop = hostLoop;
         _transport = transport;
         LocalSide = localSide;
-        if (transport != null) transport.MessageReceived += OnTransportMessage;
+        if (transport != null)
+        {
+            transport.MessageReceived += OnTransportMessage;
+            transport.PeerDisconnected += _ => PeerDisconnected?.Invoke();
+        }
     }
 
     public static NetSession CreateHotseatLoopback(GameLoop loop) =>
