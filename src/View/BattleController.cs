@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using Godot;
 using ShadowCardSmash.App;
@@ -6,6 +7,8 @@ using ShadowCardSmash.Cards;
 using ShadowCardSmash.Cards.Resources;
 using ShadowCardSmash.Domain;
 using ShadowCardSmash.Engine;
+using ShadowCardSmash.Engine.Agents;
+using ShadowCardSmash.View.Agents;
 
 namespace ShadowCardSmash.View;
 
@@ -39,6 +42,12 @@ public partial class BattleController : Node
 
     private bool _isAnimating;
     private int _consumedEventCount;
+
+    // Phase 0 agent abstraction: each side has an IPlayerAgent; the driver loop awaits the agent whose
+    // side matches CurrentPlayer. Hotseat uses two HumanAgents; networked mode swaps one for a RemoteAgent.
+    private readonly IPlayerAgent[] _agents = new IPlayerAgent[2];
+    private CancellationTokenSource _ctSource = null!;
+    private HumanAgent CurrentHumanAgent => (HumanAgent)_agents[(int)LocalSide];
 
     public PlayerSide LocalSide => _loop.State.CurrentPlayer; // hot-seat: always view current player
 
@@ -98,6 +107,58 @@ public partial class BattleController : Node
         // Mark initial events as consumed so we don't animate game-setup retroactively.
         _consumedEventCount = _loop.EventLog.Count;
         Rebind();
+
+        // Hot seat: both sides are local humans. Kick off the agent-driven main loop.
+        _agents[(int)PlayerSide.First]  = new HumanAgent(PlayerSide.First);
+        _agents[(int)PlayerSide.Second] = new HumanAgent(PlayerSide.Second);
+        _ctSource = new CancellationTokenSource();
+        _ = RunGameAsync();
+    }
+
+    public override void _ExitTree() => _ctSource?.Cancel();
+
+    /// <summary>
+    /// Driver loop: poll the agent whose side matches CurrentPlayer, await its action, submit it, play
+    /// resulting events, rebind, repeat. Cancellation triggers on scene exit.
+    /// </summary>
+    private async Task RunGameAsync()
+    {
+        try
+        {
+            while (!_loop.IsGameOver && !_ctSource.IsCancellationRequested)
+            {
+                _isAnimating = false; // unlock UI for whoever's turn it is
+                var agent = _agents[(int)_loop.State.CurrentPlayer];
+                IGameAction action;
+                try
+                {
+                    action = await agent.ChooseAction(_loop.State, _ctSource.Token);
+                }
+                catch (OperationCanceledException) { return; }
+
+                _isAnimating = true;
+                try
+                {
+                    _loop.Submit(action);
+                }
+                catch (InvalidActionException e)
+                {
+                    _board.SetStatus($"非法操作: {e.Message}");
+                    ResetMode();
+                    Rebind();
+                    continue;
+                }
+
+                await PlayPendingEventsAsync();
+                ResetMode();
+                Rebind();
+            }
+            _isAnimating = false;
+        }
+        catch (Exception ex)
+        {
+            GD.PrintErr($"[BattleController.RunGameAsync] Fatal: {ex}");
+        }
     }
 
     private void OnHandCardClicked(int sideIndex, int instanceId)
@@ -433,35 +494,11 @@ public partial class BattleController : Node
     }
 
     /// <summary>
-    /// Fire-and-forget async dispatch: submit the action, animate the new events, then rebind.
-    /// Marked async void because it's an input-handler trampoline; exceptions are converted to status messages.
+    /// Hand the finished action off to the current player's HumanAgent. The driver loop
+    /// (<see cref="RunGameAsync"/>) is awaiting on that agent and will pick it up, apply via GameLoop,
+    /// play animations, and rebind. Kept as a thin trampoline so all UI handler call-sites stay unchanged.
     /// </summary>
-    private async void TrySubmit(IGameAction action)
-    {
-        _isAnimating = true;
-        try
-        {
-            try
-            {
-                _loop.Submit(action);
-            }
-            catch (InvalidActionException e)
-            {
-                _board.SetStatus($"非法操作: {e.Message}");
-                ResetMode();
-                Rebind();
-                return;
-            }
-
-            await PlayPendingEventsAsync();
-            ResetMode();
-            Rebind();
-        }
-        finally
-        {
-            _isAnimating = false;
-        }
-    }
+    private void TrySubmit(IGameAction action) => CurrentHumanAgent.Submit(action);
 
     private async Task PlayPendingEventsAsync()
     {
