@@ -48,8 +48,16 @@ public partial class MultiplayerLobbyController : Control
         _transport.PeerConnected += OnPeerConnected;
         _transport.PeerDisconnected += OnPeerDisconnected;
         _transport.MessageReceived += OnNetMessage;
-        _transport.TransportError += err => Log($"[error] {err}");
+        _transport.TransportError += OnTransportError;
         UpdateStatus("选择 Host（开主机）或 Join（加入）");
+    }
+
+    private void OnTransportError(string err)
+    {
+        // Guarded: after TransitionToBattle this lobby instance is freed but the transport lives on
+        // under /root and could still surface errors. Drop them silently — Battle scene wires its own.
+        if (!IsInstanceValid(this) || !IsInstanceValid(_logArea)) return;
+        Log($"[error] {err}");
     }
 
     public override void _ExitTree()
@@ -300,6 +308,7 @@ public partial class MultiplayerLobbyController : Control
         _transport.PeerConnected -= OnPeerConnected;
         _transport.PeerDisconnected -= OnPeerDisconnected;
         _transport.MessageReceived -= OnNetMessage;
+        _transport.TransportError -= OnTransportError;
 
         // Reparent transport from this scene to /root so it survives scene change.
         RemoveChild(_transport);

@@ -82,6 +82,7 @@ public partial class EnetTransport : Node, INetTransport
     {
         if (_peer is null) return;
         _peer.Poll();
+        if (_peer is null) return; // Poll() can synchronously fire signals that call Stop().
 
         // Synthetic "connection failed" detection: transitioned out of Connecting without ever reaching Connected.
         var status = _peer.GetConnectionStatus();
@@ -90,9 +91,12 @@ public partial class EnetTransport : Node, INetTransport
         {
             TransportError?.Invoke("Connection failed (server unreachable or refused).");
         }
+        if (_peer is null) return;
         _lastStatus = status;
 
-        while (_peer.GetAvailablePacketCount() > 0)
+        // Re-check _peer each iteration: a MessageReceived handler may call Stop() (e.g., on
+        // HandshakeRejected) which nulls _peer; without the guard the next GetAvailablePacketCount NREs.
+        while (_peer is not null && _peer.GetAvailablePacketCount() > 0)
         {
             int fromId = _peer.GetPacketPeer();
             byte[] bytes = _peer.GetPacket();
