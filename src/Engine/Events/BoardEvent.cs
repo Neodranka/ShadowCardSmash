@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using ShadowCardSmash.Domain;
 
 namespace ShadowCardSmash.Engine;
@@ -8,7 +9,46 @@ namespace ShadowCardSmash.Engine;
 ///   1. EventBus listeners react to them (card-script hooks, persistent buffs).
 ///   2. The same instances are appended to GameLoop.EventLog so View / Net can replay.
 /// Sealed records keep the closed hierarchy explicit; adding a new event = add a record + emit it from EffectPrimitives.
+///
+/// JSON: polymorphic via "$type" discriminator. Adding a new BoardEvent requires (a) a new
+/// [JsonDerivedType(...)] entry here, (b) a round-trip unit test in ActionEventJsonTests.
 /// </summary>
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")]
+[JsonDerivedType(typeof(GameStartedEvent),             "GameStarted")]
+[JsonDerivedType(typeof(GameEndedEvent),               "GameEnded")]
+[JsonDerivedType(typeof(PhaseChangedEvent),            "PhaseChanged")]
+[JsonDerivedType(typeof(TurnStartedEvent),             "TurnStarted")]
+[JsonDerivedType(typeof(TurnEndedEvent),               "TurnEnded")]
+[JsonDerivedType(typeof(ManaChangedEvent),             "ManaChanged")]
+[JsonDerivedType(typeof(CardDrawnEvent),               "CardDrawn")]
+[JsonDerivedType(typeof(CardOverdrawnEvent),           "CardOverdrawn")]
+[JsonDerivedType(typeof(FatigueEvent),                 "Fatigue")]
+[JsonDerivedType(typeof(CardPlayedEvent),              "CardPlayed")]
+[JsonDerivedType(typeof(MinionSummonedEvent),          "MinionSummoned")]
+[JsonDerivedType(typeof(AmuletPlacedEvent),            "AmuletPlaced")]
+[JsonDerivedType(typeof(MinionAttacksEvent),           "MinionAttacks")]
+[JsonDerivedType(typeof(MinionDamagedEvent),           "MinionDamaged")]
+[JsonDerivedType(typeof(PlayerDamagedEvent),           "PlayerDamaged")]
+[JsonDerivedType(typeof(PlayerHealedEvent),            "PlayerHealed")]
+[JsonDerivedType(typeof(MinionHealedEvent),            "MinionHealed")]
+[JsonDerivedType(typeof(MinionDestroyedEvent),         "MinionDestroyed")]
+[JsonDerivedType(typeof(AmuletDestroyedEvent),         "AmuletDestroyed")]
+[JsonDerivedType(typeof(MinionVanishedEvent),          "MinionVanished")]
+[JsonDerivedType(typeof(MinionEvolvedEvent),           "MinionEvolved")]
+[JsonDerivedType(typeof(EvolutionPointsGrantedEvent),  "EvolutionPointsGranted")]
+[JsonDerivedType(typeof(SilenceAppliedEvent),          "SilenceApplied")]
+[JsonDerivedType(typeof(BuffAppliedEvent),             "BuffApplied")]
+[JsonDerivedType(typeof(KeywordGainedEvent),           "KeywordGained")]
+[JsonDerivedType(typeof(BarrierGainedEvent),           "BarrierGained")]
+[JsonDerivedType(typeof(BarrierLostEvent),             "BarrierLost")]
+[JsonDerivedType(typeof(PlayerBarrierGainedEvent),     "PlayerBarrierGained")]
+[JsonDerivedType(typeof(PlayerBarrierLostEvent),       "PlayerBarrierLost")]
+[JsonDerivedType(typeof(CountdownTickedEvent),         "CountdownTicked")]
+[JsonDerivedType(typeof(AmuletActivatedEvent),         "AmuletActivated")]
+[JsonDerivedType(typeof(CardZoneChangedEvent),         "CardZoneChanged")]
+[JsonDerivedType(typeof(TileEffectAppliedEvent),       "TileEffectApplied")]
+[JsonDerivedType(typeof(PlayerPickRequestEvent),       "PlayerPickRequest")]
+[JsonDerivedType(typeof(MulliganConfirmedEvent),       "MulliganConfirmed")]
 public abstract record BoardEvent
 {
     public int Sequence { get; init; }
@@ -59,4 +99,4 @@ public sealed record CardZoneChangedEvent(InstanceId Instance, Zone From, Zone T
 public sealed record TileEffectAppliedEvent(PlayerSide Side, int TileIndex, string EffectKey, int Duration) : BoardEvent;
 
 public sealed record PlayerPickRequestEvent(PlayerSide Side, string Reason) : BoardEvent;
-public sealed record MulliganConfirmedEvent(PlayerSide Side, IReadOnlyList<int> SwappedIndices) : BoardEvent;
+public sealed record MulliganConfirmedEvent(PlayerSide Side, int[] SwappedIndices) : BoardEvent;

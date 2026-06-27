@@ -2,7 +2,7 @@ using ShadowCardSmash.Domain;
 
 namespace ShadowCardSmash.Engine;
 
-public sealed record MulliganAction(PlayerSide Issuer, IReadOnlyList<int> SwapIndices) : IGameAction
+public sealed record MulliganAction(PlayerSide Issuer, int[] SwapIndices) : IGameAction
 {
     public ActionResult Validate(GameState state)
     {

@@ -43,6 +43,30 @@ public static class GameStateJson
         JsonSerializer.Deserialize<GameState>(json, Options)
         ?? throw new InvalidOperationException("Deserialize returned null.");
 
+    /// <summary>Polymorphic action serialize — writes "$type" discriminator for the concrete IGameAction.</summary>
+    public static string SerializeAction(IGameAction action) =>
+        JsonSerializer.Serialize<IGameAction>(action, Options);
+
+    public static IGameAction DeserializeAction(string json) =>
+        JsonSerializer.Deserialize<IGameAction>(json, Options)
+        ?? throw new InvalidOperationException("Action deserialize returned null.");
+
+    /// <summary>Polymorphic event serialize — writes "$type" discriminator for the concrete BoardEvent.</summary>
+    public static string SerializeEvent(BoardEvent evt) =>
+        JsonSerializer.Serialize<BoardEvent>(evt, Options);
+
+    public static BoardEvent DeserializeEvent(string json) =>
+        JsonSerializer.Deserialize<BoardEvent>(json, Options)
+        ?? throw new InvalidOperationException("Event deserialize returned null.");
+
+    /// <summary>Batch serialize a list of events as a single JSON array of polymorphic BoardEvent.</summary>
+    public static string SerializeEventBatch(IReadOnlyList<BoardEvent> events) =>
+        JsonSerializer.Serialize<IReadOnlyList<BoardEvent>>(events, Options);
+
+    public static BoardEvent[] DeserializeEventBatch(string json) =>
+        JsonSerializer.Deserialize<BoardEvent[]>(json, Options)
+        ?? throw new InvalidOperationException("Event batch deserialize returned null.");
+
     private sealed class CardIdConverter : JsonConverter<CardId>
     {
         public override CardId Read(ref Utf8JsonReader r, Type t, JsonSerializerOptions o) => new(r.GetInt32());

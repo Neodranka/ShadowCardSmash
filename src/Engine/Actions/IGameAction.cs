@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using ShadowCardSmash.Domain;
 
 namespace ShadowCardSmash.Engine;
@@ -5,7 +6,16 @@ namespace ShadowCardSmash.Engine;
 /// <summary>
 /// Player-issued command. Validate → Apply. Adding a new command = a new class implementing this; no framework change.
 /// Persisted/transported by the Net layer; same instance executes on both peers under deterministic engine.
+///
+/// JSON: serialized polymorphically via the "$type" discriminator. Adding a new IGameAction implementation
+/// requires (a) a new [JsonDerivedType(...)] entry here, (b) a round-trip unit test in ActionEventJsonTests.
 /// </summary>
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")]
+[JsonDerivedType(typeof(PlayCardAction), "PlayCard")]
+[JsonDerivedType(typeof(AttackAction),   "Attack")]
+[JsonDerivedType(typeof(EvolveAction),   "Evolve")]
+[JsonDerivedType(typeof(EndTurnAction),  "EndTurn")]
+[JsonDerivedType(typeof(MulliganAction), "Mulligan")]
 public interface IGameAction
 {
     /// <summary>The side issuing this action.</summary>
