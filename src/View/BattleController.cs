@@ -104,7 +104,7 @@ public partial class BattleController : Node
         _netSession = NetSession.CreateNetHost(_loop, transport, _fixedLocalSide);
         _netSession.ActionApplied += OnActionApplied;
         _netSession.ActionRejected += OnActionRejected;
-        // Loop is already past mulligan (lobby ran them). Just bind UI to current state.
+        GD.Print($"[Battle] NetHost initialized, localSide={_fixedLocalSide}, transport.IsRunning={transport.IsRunning}");
         Rebind();
     }
 
@@ -118,6 +118,7 @@ public partial class BattleController : Node
         _netSession = NetSession.CreateNetClient(transport, _fixedLocalSide, initial);
         _netSession.ActionApplied += OnActionApplied;
         _netSession.ActionRejected += OnActionRejected;
+        GD.Print($"[Battle] NetClient initialized, localSide={_fixedLocalSide}, transport={transport.IsRunning}, initialTurn={initial.TurnNumber}, currentPlayer={initial.CurrentPlayer}");
         Rebind();
     }
 
@@ -510,6 +511,7 @@ public partial class BattleController : Node
     /// </summary>
     private async void OnActionApplied(ActionApplied applied)
     {
+        GD.Print($"[Battle.OnActionApplied] seq={applied.Sequence} action={applied.Action.GetType().Name} events={applied.Events.Length} mode={BattleSetup.Mode}");
         _isAnimating = true;
         try
         {
@@ -530,6 +532,7 @@ public partial class BattleController : Node
 
     private void OnActionRejected(ActionRejected reject)
     {
+        GD.Print($"[Battle.OnActionRejected] reqId={reject.ClientRequestId} action={reject.Action.GetType().Name} reason={reject.Reason}");
         _board.SetStatus($"非法操作: {reject.Reason}");
         ResetMode();
         Rebind();
@@ -694,7 +697,8 @@ public partial class BattleController : Node
     /// </summary>
     public override void _Input(InputEvent @event)
     {
-        if (_isAnimating || _loop is null) return;
+        // _loop is null on net-client (host owns the loop). Don't gate cancel input on it.
+        if (_isAnimating || _netSession is null) return;
         if (_mode == Mode.Idle) return;
         if (IsPopupOpen()) return; // let the popup own right-click while it is up.
 
