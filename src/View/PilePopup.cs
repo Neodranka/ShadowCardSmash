@@ -88,7 +88,9 @@ public partial class PilePopup : Control
         };
         vb.AddChild(scroll);
 
-        _grid = new GridContainer { Columns = 6 };
+        // 5 columns: at CardView.CardWidth = 192 + 8 separation, 5 cards = 992 px fits the ~1052 panel inner width.
+        // 6 used to overflow the rightmost card.
+        _grid = new GridContainer { Columns = 5 };
         _grid.AddThemeConstantOverride("h_separation", 8);
         _grid.AddThemeConstantOverride("v_separation", 8);
         scroll.AddChild(_grid);

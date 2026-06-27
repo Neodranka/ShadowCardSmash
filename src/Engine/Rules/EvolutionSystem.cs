@@ -37,9 +37,10 @@ public static class EvolutionSystem
         target.MaxHealth = Math.Max(script.EvolvedHealth, target.MaxHealth + EvolutionHealthBoost);
         target.CurrentHealth = Math.Min(target.MaxHealth, target.CurrentHealth + EvolutionHealthBoost);
         target.AddKeyword(Keyword.Rush);
-        // Evolving fully lifts summoning sickness — minion may attack anything immediately (including hero).
+        // Evolving lifts summoning sickness so a fresh minion can attack immediately (including hero).
+        // BUT does NOT refund an attack already used this turn — a minion that attacked then evolved stays spent.
         target.SummonedThisTurn = false;
-        target.CanAttackThisTurn = true;
+        if (target.AttacksThisTurn == 0) target.CanAttackThisTurn = true;
 
         if (consumesEP)
         {
