@@ -36,6 +36,7 @@ public partial class MainMenuController : Control
 
         AddButton(vb, "Hot Seat", OnHotSeat);
         AddButton(vb, "Multiplayer (TODO)", () => { }, disabled: true);
+        AddButton(vb, "Network Test (Dev)", OnNetworkTest);
         AddButton(vb, "Deck Builder", OnDeckBuilder);
         AddButton(vb, "Quit", () => GetTree().Quit());
     }
@@ -60,5 +61,10 @@ public partial class MainMenuController : Control
     private void OnDeckBuilder()
     {
         GetTree().ChangeSceneToFile("res://scenes/DeckBuilder.tscn");
+    }
+
+    private void OnNetworkTest()
+    {
+        GetTree().ChangeSceneToFile("res://scenes/NetworkTest.tscn");
     }
 }

@@ -19,5 +19,9 @@
     <Compile Include="..\..\src\Domain\**\*.cs" LinkBase="Domain" />
     <Compile Include="..\..\src\Engine\**\*.cs" LinkBase="Engine" />
     <Compile Include="..\..\src\Cards\Base\**\*.cs" LinkBase="Cards\Base" />
+    <!-- Net layer: include the Godot-free parts (Messages / Serialization / Session config). -->
+    <Compile Include="..\..\src\Net\Messages\**\*.cs" LinkBase="Net\Messages" />
+    <Compile Include="..\..\src\Net\Serialization\**\*.cs" LinkBase="Net\Serialization" />
+    <Compile Include="..\..\src\Net\Session\**\*.cs" LinkBase="Net\Session" />
   </ItemGroup>
 </Project>
