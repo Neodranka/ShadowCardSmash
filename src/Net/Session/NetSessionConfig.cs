@@ -12,7 +12,9 @@ namespace ShadowCardSmash.Net;
 /// </summary>
 public static class NetSessionConfig
 {
-    public const int ProtocolVersion = 1;
+    // V2 (Phase 4): added ActionRequest / ActionApplied / ActionRejected wire messages with embedded
+    //               IGameAction / BoardEvent[] / GameState payloads.
+    public const int ProtocolVersion = 2;
     public const int DefaultPort = 49321;
     public const int MaxPlayers = 2;        // V1: strictly 1v1; lobby slots are hardcoded to host + 1 client.
 }
