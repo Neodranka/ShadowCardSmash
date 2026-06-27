@@ -127,17 +127,30 @@ public sealed class NetSession
             newEvents[i] = _hostLoop.EventLog[eventsBefore + i];
 
         long seq = ++_hostSequence;
-        var applied = new ActionApplied(
+        long? originatingId = fromPeerId == SelfPeer ? null : requestId;
+
+        // Host-local: unfiltered (host sees everything).
+        var hostApplied = new ActionApplied(
             Sequence: seq,
-            OriginatingRequestId: fromPeerId == SelfPeer ? null : requestId,
+            OriginatingRequestId: originatingId,
             Action: action,
             Events: newEvents,
             StateAfter: _hostLoop.State.Snapshot());
+        ActionApplied?.Invoke(hostApplied);
 
-        // Broadcast to all remote peers (no-op in hotseat where _transport is null).
-        _transport?.Broadcast(applied);
-        // Fire locally on host too — every peer (host + client) processes the same ActionApplied uniformly.
-        ActionApplied?.Invoke(applied);
+        // Remote clients: hide opponent's private zones + redact card-draw events.
+        // V1 1v1: there's exactly one remote viewer = host's opposite side.
+        if (_transport != null && LocalSide.HasValue)
+        {
+            var clientSide = LocalSide.Value.Opponent();
+            var clientApplied = new ActionApplied(
+                Sequence: seq,
+                OriginatingRequestId: originatingId,
+                Action: action,
+                Events: EventFilter.FilterAll(newEvents, clientSide),
+                StateAfter: hostApplied.StateAfter.FilterFor(clientSide));
+            _transport.Broadcast(clientApplied);
+        }
     }
 
     private void DispatchRejected(ActionRejected reject, int targetPeerId)

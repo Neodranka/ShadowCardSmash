@@ -30,6 +30,40 @@ public sealed class GameState
     public PlayerState GetOpponentOf(PlayerSide side) => Players[(int)side.Opponent()];
 
     /// <summary>
+    /// Hidden-info filtered copy from <paramref name="viewer"/>'s perspective. Opponent's hand and
+    /// deck contents have their CardId replaced with <see cref="CardId.Hidden"/>; counts and
+    /// InstanceIds are preserved so UI can still render face-down stacks and track moves.
+    /// Public zones (field, graveyard, vanished) are NOT touched — these are always visible.
+    /// V1 1v1: assumes exactly two seats and that "opponent" = the other side.
+    /// </summary>
+    public GameState FilterFor(PlayerSide viewer)
+    {
+        var copy = Snapshot();
+        var opp = copy.GetPlayer(viewer.Opponent());
+        for (int i = 0; i < opp.Hand.Count; i++)
+        {
+            opp.Hand[i] = new RuntimeCard
+            {
+                Instance = opp.Hand[i].Instance,
+                Card = CardId.Hidden,
+                Owner = opp.Side,
+                Zone = Zone.Hand,
+            };
+        }
+        for (int i = 0; i < opp.Deck.Count; i++)
+        {
+            opp.Deck[i] = new RuntimeCard
+            {
+                Instance = opp.Deck[i].Instance,
+                Card = CardId.Hidden,
+                Owner = opp.Side,
+                Zone = Zone.Deck,
+            };
+        }
+        return copy;
+    }
+
+    /// <summary>
     /// Full deep copy used by GameLoop to snapshot before each external Action
     /// (enables rollback on validation failure and desync hashing).
     /// </summary>

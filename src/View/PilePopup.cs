@@ -110,7 +110,12 @@ public partial class PilePopup : Control
         {
             var cv = new CardView();
             _grid.AddChild(cv);
-            cv.Bind(card, db.Get(card.Card), onField: false);
+            // Hidden CardId = opponent's private zone (hand/deck filtered for our viewpoint) — render
+            // as face-down without querying the registry.
+            if (card.Card == CardId.Hidden)
+                cv.BindFaceDown();
+            else
+                cv.Bind(card, db.Get(card.Card), onField: false);
             cv.HoverEntered += iid => EmitSignal(SignalName.CardHovered, iid);
             cv.HoverExited += _ => EmitSignal(SignalName.CardHoverExited);
         }

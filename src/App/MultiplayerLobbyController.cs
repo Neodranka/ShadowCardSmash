@@ -207,9 +207,9 @@ public partial class MultiplayerLobbyController : Control
         loop.Submit(new MulliganAction(PlayerSide.First, Array.Empty<int>()));
         loop.Submit(new MulliganAction(PlayerSide.Second, Array.Empty<int>()));
 
-        // Push to client.
-        var snapshot = state.Snapshot();
-        _transport.Send(_connectedPeerId, new StartGame(snapshot, ClientSide: PlayerSide.Second));
+        // Push to client — filter for client's view (mask host's hand/deck CardIds to Hidden).
+        var clientSnapshot = state.FilterFor(PlayerSide.Second);
+        _transport.Send(_connectedPeerId, new StartGame(clientSnapshot, ClientSide: PlayerSide.Second));
         Log($"[send → {_connectedPeerId}] StartGame (sides assigned: host=First, client=Second)");
 
         // Hand off the live loop + transport to BattleController via BattleSetup.

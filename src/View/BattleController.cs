@@ -473,10 +473,12 @@ public partial class BattleController : Node
         switch (kind)
         {
             case PileView.Kind.Deck:
-                cards = p.Deck
-                    .OrderBy(c => _registry.Get(c.Card).Cost)
-                    .ThenBy(c => c.Card.Value)
-                    .ToArray();
+                // Opponent deck in net mode = all Hidden cards; skip ordering (registry would NRE on Hidden).
+                bool deckHasHidden = false;
+                foreach (var c in p.Deck) { if (c.Card == CardId.Hidden) { deckHasHidden = true; break; } }
+                cards = deckHasHidden
+                    ? p.Deck.ToArray()
+                    : p.Deck.OrderBy(c => _registry.Get(c.Card).Cost).ThenBy(c => c.Card.Value).ToArray();
                 title = side == LocalSide ? $"我方牌库（{p.Deck.Count}）" : $"对方牌库（{p.Deck.Count}）";
                 break;
             case PileView.Kind.Banish:

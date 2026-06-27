@@ -14,7 +14,10 @@ public static class NetSessionConfig
 {
     // V2 (Phase 4a): added ActionRequest / ActionApplied / ActionRejected.
     // V3 (Phase 4d): added StartGame for initial state push from host to client.
-    public const int ProtocolVersion = 3;
+    // V4 (Phase 5):  hidden-info filtering — CardId.Hidden sentinel in opponent's Hand/Deck and in
+    //                CardDrawnEvent for the opponent. Wire format compatible but semantic contract
+    //                changed: clients now never see opponent's private CardIds.
+    public const int ProtocolVersion = 4;
     public const int DefaultPort = 49321;
     public const int MaxPlayers = 2;        // V1: strictly 1v1; lobby slots are hardcoded to host + 1 client.
 }

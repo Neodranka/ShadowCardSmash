@@ -450,11 +450,11 @@ public partial class BoardView : Control
         foreach (var p in _lastState.Players)
         {
             var hc = p.Hand.FirstOrDefault(c => c.Instance == iid);
-            if (hc is not null) { DetailPanel.ShowFor(hc, _lastDb.Get(hc.Card), onField: false, pin: false); return; }
+            if (hc is not null) { if (hc.Card == CardId.Hidden) return; DetailPanel.ShowFor(hc, _lastDb.Get(hc.Card), onField: false, pin: false); return; }
             var fc = p.FindOnField(iid);
             if (fc is not null) { DetailPanel.ShowFor(fc, _lastDb.Get(fc.Card), onField: true, pin: false); return; }
             var dc = p.Deck.FirstOrDefault(c => c.Instance == iid);
-            if (dc is not null) { DetailPanel.ShowFor(dc, _lastDb.Get(dc.Card), onField: false, pin: false); return; }
+            if (dc is not null) { if (dc.Card == CardId.Hidden) return; DetailPanel.ShowFor(dc, _lastDb.Get(dc.Card), onField: false, pin: false); return; }
             var gc = p.Graveyard.FirstOrDefault(c => c.Instance == iid);
             if (gc is not null) { DetailPanel.ShowFor(gc, _lastDb.Get(gc.Card), onField: false, pin: false); return; }
         }
