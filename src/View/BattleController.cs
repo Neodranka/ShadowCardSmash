@@ -1,5 +1,4 @@
 using System.Reflection;
-using System.Threading;
 using System.Threading.Tasks;
 using Godot;
 using ShadowCardSmash.App;
@@ -7,8 +6,8 @@ using ShadowCardSmash.Cards;
 using ShadowCardSmash.Cards.Resources;
 using ShadowCardSmash.Domain;
 using ShadowCardSmash.Engine;
-using ShadowCardSmash.Engine.Agents;
-using ShadowCardSmash.View.Agents;
+using ShadowCardSmash.Net;
+using ShadowCardSmash.Net.Session;
 
 namespace ShadowCardSmash.View;
 
@@ -41,13 +40,10 @@ public partial class BattleController : Node
     private int? _pendingTileIndex;
 
     private bool _isAnimating;
-    private int _consumedEventCount;
 
-    // Phase 0 agent abstraction: each side has an IPlayerAgent; the driver loop awaits the agent whose
-    // side matches CurrentPlayer. Hotseat uses two HumanAgents; networked mode swaps one for a RemoteAgent.
-    private readonly IPlayerAgent[] _agents = new IPlayerAgent[2];
-    private CancellationTokenSource _ctSource = null!;
-    private HumanAgent CurrentHumanAgent => (HumanAgent)_agents[(int)LocalSide];
+    // Phase 4: all action submission + result fan-out goes through NetSession. In hotseat we use the
+    // loopback flavor (no transport) so the data flow matches networked mode exactly.
+    private NetSession _netSession = null!;
 
     public PlayerSide LocalSide => _loop.State.CurrentPlayer; // hot-seat: always view current player
 
@@ -104,61 +100,15 @@ public partial class BattleController : Node
         _loop.Submit(new MulliganAction(PlayerSide.First, System.Array.Empty<int>()));
         _loop.Submit(new MulliganAction(PlayerSide.Second, System.Array.Empty<int>()));
 
-        // Mark initial events as consumed so we don't animate game-setup retroactively.
-        _consumedEventCount = _loop.EventLog.Count;
+        // Wrap the freshly-initialized loop in a NetSession. Hotseat uses the loopback variant so the
+        // reactive ActionApplied / ActionRejected flow is identical to networked mode (Phase 4d/e).
+        // Events generated before this point (init draws, mulligan) are in _loop.EventLog but won't be
+        // animated because they were never part of any ActionApplied.
+        _netSession = NetSession.CreateHotseatLoopback(_loop);
+        _netSession.ActionApplied += OnActionApplied;
+        _netSession.ActionRejected += OnActionRejected;
+
         Rebind();
-
-        // Hot seat: both sides are local humans. Kick off the agent-driven main loop.
-        _agents[(int)PlayerSide.First]  = new HumanAgent(PlayerSide.First);
-        _agents[(int)PlayerSide.Second] = new HumanAgent(PlayerSide.Second);
-        _ctSource = new CancellationTokenSource();
-        _ = RunGameAsync();
-    }
-
-    public override void _ExitTree() => _ctSource?.Cancel();
-
-    /// <summary>
-    /// Driver loop: poll the agent whose side matches CurrentPlayer, await its action, submit it, play
-    /// resulting events, rebind, repeat. Cancellation triggers on scene exit.
-    /// </summary>
-    private async Task RunGameAsync()
-    {
-        try
-        {
-            while (!_loop.IsGameOver && !_ctSource.IsCancellationRequested)
-            {
-                _isAnimating = false; // unlock UI for whoever's turn it is
-                var agent = _agents[(int)_loop.State.CurrentPlayer];
-                IGameAction action;
-                try
-                {
-                    action = await agent.ChooseAction(_loop.State, _ctSource.Token);
-                }
-                catch (OperationCanceledException) { return; }
-
-                _isAnimating = true;
-                try
-                {
-                    _loop.Submit(action);
-                }
-                catch (InvalidActionException e)
-                {
-                    _board.SetStatus($"非法操作: {e.Message}");
-                    ResetMode();
-                    Rebind();
-                    continue;
-                }
-
-                await PlayPendingEventsAsync();
-                ResetMode();
-                Rebind();
-            }
-            _isAnimating = false;
-        }
-        catch (Exception ex)
-        {
-            GD.PrintErr($"[BattleController.RunGameAsync] Fatal: {ex}");
-        }
     }
 
     private void OnHandCardClicked(int sideIndex, int instanceId)
@@ -494,21 +444,42 @@ public partial class BattleController : Node
     }
 
     /// <summary>
-    /// Hand the finished action off to the current player's HumanAgent. The driver loop
-    /// (<see cref="RunGameAsync"/>) is awaiting on that agent and will pick it up, apply via GameLoop,
-    /// play animations, and rebind. Kept as a thin trampoline so all UI handler call-sites stay unchanged.
+    /// Hand the finished action off to the NetSession. In hotseat this resolves synchronously via the
+    /// loopback path: validation + GameLoop.Submit + ActionApplied (fires <see cref="OnActionApplied"/>).
+    /// Kept as a thin trampoline so all UI handler call-sites stay unchanged.
     /// </summary>
-    private void TrySubmit(IGameAction action) => CurrentHumanAgent.Submit(action);
+    private void TrySubmit(IGameAction action) => _netSession.SubmitLocalAction(action);
 
-    private async Task PlayPendingEventsAsync()
+    /// <summary>
+    /// React to a freshly-applied action: play each event's animation in order, then ResetMode + Rebind.
+    /// async void because it's an event-handler trampoline; exceptions surface as engine logs.
+    /// _isAnimating is set BEFORE the first await so UI handlers see the lock immediately.
+    /// </summary>
+    private async void OnActionApplied(ActionApplied applied)
     {
-        var log = _loop.EventLog;
-        while (_consumedEventCount < log.Count)
+        _isAnimating = true;
+        try
         {
-            var evt = log[_consumedEventCount];
-            _consumedEventCount++;
-            await PlayAnimationFor(evt);
+            foreach (var evt in applied.Events)
+                await PlayAnimationFor(evt);
+            ResetMode();
+            Rebind();
         }
+        catch (Exception ex)
+        {
+            GD.PrintErr($"[BattleController.OnActionApplied] {ex}");
+        }
+        finally
+        {
+            _isAnimating = false;
+        }
+    }
+
+    private void OnActionRejected(ActionRejected reject)
+    {
+        _board.SetStatus($"非法操作: {reject.Reason}");
+        ResetMode();
+        Rebind();
     }
 
     private async Task PlayAnimationFor(BoardEvent evt)
