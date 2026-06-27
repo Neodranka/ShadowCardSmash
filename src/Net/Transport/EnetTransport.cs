@@ -116,7 +116,16 @@ public partial class EnetTransport : Node, INetTransport
 		}
 	}
 
-	public override void _ExitTree() => Stop();
+	// IMPORTANT: do NOT auto-Stop in _ExitTree. Godot's Reparent() (and RemoveChild+AddChild) fires
+	// _ExitTree during the parent change — auto-stopping there would tear down the ENet peer the moment
+	// we hand off this Node from lobby to /root, dropping in-flight packets (e.g., StartGame) and
+	// leaving Battle scene with a dead transport. NotificationPredelete only fires when the node is
+	// actually being freed, which is the right time to release the peer.
+	public override void _Notification(int what)
+	{
+		base._Notification(what);
+		if (what == NotificationPredelete) Stop();
+	}
 
 	private void AttachPeer(ENetMultiplayerPeer peer, bool isHost)
 	{
