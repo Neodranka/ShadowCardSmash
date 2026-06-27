@@ -153,7 +153,8 @@ public partial class CardView : PanelContainer
         _innerRoot.AddChild(_hp);
     }
 
-    public void Bind(RuntimeCard card, ICardScript script, bool onField, int viewerMana = 0)
+    public void Bind(RuntimeCard card, ICardScript script, bool onField, int viewerMana = 0,
+        bool showAttackHint = true)
     {
         BuildUi();
         Instance = card.Instance;
@@ -228,8 +229,10 @@ public partial class CardView : PanelContainer
             _shieldBarrier.Visible = card.BarrierStacks > 0;
 
             // Storm icon: can attack any target (incl. hero). Rush icon: minion-only on summon turn.
-            bool stormReady = card.CanAttackThisTurn && (!card.SummonedThisTurn || card.HasKeyword(Keyword.Storm));
-            bool rushReady  = card.CanAttackThisTurn && card.SummonedThisTurn
+            // Suppressed for the opponent's minions (showAttackHint=false): the player only needs to know
+            // what *their own* minions can do; opponent attack-readiness is noise.
+            bool stormReady = showAttackHint && card.CanAttackThisTurn && (!card.SummonedThisTurn || card.HasKeyword(Keyword.Storm));
+            bool rushReady  = showAttackHint && card.CanAttackThisTurn && card.SummonedThisTurn
                               && card.HasKeyword(Keyword.Rush) && !card.HasKeyword(Keyword.Storm);
             if (stormReady)      { _attackIcon.Texture = LoadAttackIconStorm(); _attackIcon.Visible = true; }
             else if (rushReady)  { _attackIcon.Texture = LoadAttackIconRush();  _attackIcon.Visible = true; }

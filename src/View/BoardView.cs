@@ -314,10 +314,10 @@ public partial class BoardView : Control
         EnemyHand.Rebind(enemy.Hand, db, 0); // 对手手牌脸朝下，不需要强化预览
 
         _fieldCardLookup.Clear();
-        RebindRow(MyTiles, me, db, OnMinionClicked, _fieldCardLookup);
-        RebindRow(EnemyTiles, enemy, db, OnMinionClicked, _fieldCardLookup);
-        RebindTerrainSlot(MyTerrain, me.TerrainSlot, db, _fieldCardLookup);
-        RebindTerrainSlot(EnemyTerrain, enemy.TerrainSlot, db, _fieldCardLookup);
+        RebindRow(MyTiles, me, db, OnMinionClicked, _fieldCardLookup, showAttackHint: true);
+        RebindRow(EnemyTiles, enemy, db, OnMinionClicked, _fieldCardLookup, showAttackHint: false);
+        RebindTerrainSlot(MyTerrain, me.TerrainSlot, db, _fieldCardLookup, showAttackHint: true);
+        RebindTerrainSlot(EnemyTerrain, enemy.TerrainSlot, db, _fieldCardLookup, showAttackHint: false);
 
         EndTurnButton.Disabled = !myTurn || state.Phase != GamePhase.Main;
         StatusLabel.Text = state.Phase switch
@@ -339,7 +339,8 @@ public partial class BoardView : Control
 
     private void RebindRow(TileSlotView[] tiles, PlayerState p, ICardDatabase db,
         System.Action<TileSlotView, int> onMinionClicked,
-        Dictionary<InstanceId, CardView> lookup)
+        Dictionary<InstanceId, CardView> lookup,
+        bool showAttackHint)
     {
         for (int i = 0; i < tiles.Length; i++)
         {
@@ -348,7 +349,7 @@ public partial class BoardView : Control
             if (occ is null) { tiles[i].SetOccupant(null); continue; }
             var cv = new CardView();
             tiles[i].SetOccupant(cv);
-            cv.Bind(occ, db.Get(occ.Card), onField: true);
+            cv.Bind(occ, db.Get(occ.Card), onField: true, showAttackHint: showAttackHint);
             var capturedTile = tiles[i];
             cv.Clicked += iid => onMinionClicked(capturedTile, iid);
             cv.HoverEntered += iid => OnFieldCardHovered(iid);
@@ -358,13 +359,13 @@ public partial class BoardView : Control
     }
 
     private void RebindTerrainSlot(TileSlotView slot, TileState terrain, ICardDatabase db,
-        Dictionary<InstanceId, CardView> lookup)
+        Dictionary<InstanceId, CardView> lookup, bool showAttackHint)
     {
         slot.Highlight(false);
         if (terrain.Occupant is not { } occ) { slot.SetOccupant(null); return; }
         var cv = new CardView();
         slot.SetOccupant(cv);
-        cv.Bind(occ, db.Get(occ.Card), onField: true);
+        cv.Bind(occ, db.Get(occ.Card), onField: true, showAttackHint: showAttackHint);
         cv.Clicked += iid => OnMinionClicked(slot, iid);
         cv.HoverEntered += iid => OnFieldCardHovered(iid);
         cv.HoverExited += _ => DetailPanel.HoverHide();
