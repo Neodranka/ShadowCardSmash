@@ -9,7 +9,8 @@ public sealed class GameState
     public GamePhase Phase = GamePhase.NotStarted;
     public GameResult Result = GameResult.InProgress;
 
-    public PlayerState[] Players { get; } =
+    // Public field (not auto-property) so System.Text.Json can replace contents on Deserialize.
+    public PlayerState[] Players =
     {
         new() { Side = PlayerSide.First },
         new() { Side = PlayerSide.Second },
@@ -20,8 +21,9 @@ public sealed class GameState
     public int RandomSeed;
     public ulong RandomCounter;
 
-    private int _nextInstanceId = 1;
-    public InstanceId AllocateInstanceId() => new(_nextInstanceId++);
+    /// <summary>Monotonic seed for AllocateInstanceId. Public so JSON serialization can round-trip it.</summary>
+    public int NextInstanceIdSeed = 1;
+    public InstanceId AllocateInstanceId() => new(NextInstanceIdSeed++);
 
     public PlayerState GetPlayer(PlayerSide side) => Players[(int)side];
     public PlayerState GetCurrentPlayer() => Players[(int)CurrentPlayer];
@@ -41,7 +43,7 @@ public sealed class GameState
             Result = Result,
             RandomSeed = RandomSeed,
             RandomCounter = RandomCounter,
-            _nextInstanceId = _nextInstanceId,
+            NextInstanceIdSeed = NextInstanceIdSeed,
             Mulligan = Mulligan.Clone(),
         };
         for (int i = 0; i < Players.Length; i++)
