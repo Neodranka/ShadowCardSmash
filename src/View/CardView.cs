@@ -161,6 +161,10 @@ public partial class CardView : PanelContainer
         Card = card.Card;
         IsOnField = onField;
         _innerRoot.Visible = true;
+        // Re-show labels that BindFaceDown may have hidden (idempotency if same CardView reused).
+        // The Modulate / atk / hp visibilities are explicitly set further down based on card state.
+        _cost.Visible = true;
+        _name.Visible = true;
 
         // No-diamond frame by rarity + separate diamond layers (cost diamond color follows rarity).
         _frameTex.Texture = LoadFrameTexture(script.Rarity);
@@ -246,23 +250,29 @@ public partial class CardView : PanelContainer
         }
     }
 
-    /// <summary>Render as an opaque card back (opponent hand in hot seat).</summary>
+    /// <summary>Render as an opaque card back (opponent hand in hot seat, opponent deck in net mode).</summary>
     public void BindFaceDown()
     {
         BuildUi();
         Instance = InstanceId.None;
         Card = CardId.None;
         IsOnField = false;
-        _innerRoot.Visible = false;
-        // Reuse the bronze no-diamond frame as the universal "card back" without overlays.
-        // A dedicated card-back PNG can replace this later.
+        // Keep _innerRoot visible — _frameTex lives inside it, so hiding the root would hide the
+        // card back too. Show ONLY the frame; hide every info-bearing element individually.
+        _innerRoot.Visible = true;
         _frameTex.Texture = LoadFrameTexture(Rarity.Bronze);
+        _artTex.Visible = false;
+        _artPlaceholder.Visible = false;
         _diamondCost.Visible = false;
         _diamondAtk.Visible = false;
         _diamondHp.Visible = false;
         _shieldWard.Visible = false;
         _shieldBarrier.Visible = false;
         _attackIcon.Visible = false;
+        _cost.Visible = false;
+        _name.Visible = false;
+        _atk.Visible = false;
+        _hp.Visible = false;
         Modulate = new Color(0.35f, 0.32f, 0.45f);
         TooltipText = "对手手牌";
     }
