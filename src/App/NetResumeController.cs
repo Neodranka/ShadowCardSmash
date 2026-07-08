@@ -16,7 +16,7 @@ namespace ShadowCardSmash.App;
 /// </summary>
 public partial class NetResumeController : Control
 {
-    private const double ConnectTimeoutSeconds = 15.0;
+    private const double ConnectTimeoutSeconds = 5.0;
 
     private EnetTransport _transport = null!;
     private PersistedNetSession _persisted = null!;
