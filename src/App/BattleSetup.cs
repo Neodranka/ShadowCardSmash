@@ -1,6 +1,7 @@
 using ShadowCardSmash.Cards.Resources;
 using ShadowCardSmash.Domain;
 using ShadowCardSmash.Engine;
+using ShadowCardSmash.Net;
 using ShadowCardSmash.Net.Transport;
 
 namespace ShadowCardSmash.App;
@@ -34,8 +35,14 @@ public static class BattleSetup
     /// <summary>Host-only: live GameLoop built in lobby (already past mulligan). BattleController takes ownership.</summary>
     public static GameLoop? PendingHostLoop;
 
-    /// <summary>Session token agreed at handshake. Phase 6: stored for Phase 7 reconnect handshake.</summary>
+    /// <summary>Session token agreed at handshake. Used by client's Phase 7 ReconnectRequest and
+    /// validated by host on receipt.</summary>
     public static System.Guid? NetSessionToken;
+
+    /// <summary>Client-only: host address/port stored during lobby so the client can retry ENet
+    /// connect after a drop. Ignored by host.</summary>
+    public static string NetHostAddress = "";
+    public static int NetHostPort = NetSessionConfig.DefaultPort;
 
     /// <summary>Clear all net handoff fields after BattleController consumes them.</summary>
     public static void ClearNetHandoff()

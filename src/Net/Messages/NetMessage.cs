@@ -23,6 +23,9 @@ namespace ShadowCardSmash.Net;
 [JsonDerivedType(typeof(ActionApplied),     "ActionApplied")]
 [JsonDerivedType(typeof(ActionRejected),    "ActionRejected")]
 [JsonDerivedType(typeof(StartGame),         "StartGame")]
+[JsonDerivedType(typeof(ReconnectRequest),  "ReconnectRequest")]
+[JsonDerivedType(typeof(ReconnectAccepted), "ReconnectAccepted")]
+[JsonDerivedType(typeof(ReconnectRejected), "ReconnectRejected")]
 public abstract record NetMessage;
 
 /// <summary>Client → Host: initial connection handshake. Host validates ProtocolVersion and assigns a side.</summary>
@@ -60,3 +63,15 @@ public sealed record ActionRejected(long ClientRequestId, IGameAction Action, st
 /// Sent after lobby handshake completes and host runs GameInitializer + mulligans locally.
 /// Client uses this to seed its mirror state and transition to the Battle scene.</summary>
 public sealed record StartGame(GameState InitialState, PlayerSide ClientSide) : NetMessage;
+
+/// <summary>Client → Host during grace: "I'm the peer that dropped, here is my session token,
+/// please put me back". Host validates token; on match replies with <see cref="ReconnectAccepted"/>.</summary>
+public sealed record ReconnectRequest(Guid SessionToken) : NetMessage;
+
+/// <summary>Host → reconnecting client: token OK, here is the current filtered state so you can
+/// resume where you left off. Assigned side re-sent for good measure (should match original).</summary>
+public sealed record ReconnectAccepted(GameState State, PlayerSide AssignedSide) : NetMessage;
+
+/// <summary>Host → reconnecting client: token mismatch, session already expired, or some other reason.
+/// Client falls back to forfeit / back-to-menu.</summary>
+public sealed record ReconnectRejected(string Reason) : NetMessage;

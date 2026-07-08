@@ -17,7 +17,8 @@ public static class NetSessionConfig
     // V4 (Phase 5):  hidden-info filtering — CardId.Hidden sentinel in opponent's Hand/Deck and in
     //                CardDrawnEvent for the opponent. Wire format compatible but semantic contract
     //                changed: clients now never see opponent's private CardIds.
-    public const int ProtocolVersion = 4;
+    // V5 (Phase 7):  added ReconnectRequest / ReconnectAccepted / ReconnectRejected.
+    public const int ProtocolVersion = 5;
     public const int DefaultPort = 49321;
     public const int MaxPlayers = 2;        // V1: strictly 1v1; lobby slots are hardcoded to host + 1 client.
 }

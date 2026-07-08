@@ -50,6 +50,19 @@ public sealed class NetSession
     /// Never fires in HotseatLoopback (no transport).</summary>
     public event Action? PeerDisconnected;
 
+    /// <summary>Host: fires after a valid ReconnectRequest is honored (state re-sent to new peer).
+    /// Client: fires after ReconnectAccepted is received (mirror already replaced).
+    /// UI clears its disconnect-grace overlay in response.</summary>
+    public event Action? ReconnectCompleted;
+
+    /// <summary>Client only: fires on ReconnectRejected (bad token, session gone). UI shows forfeit.</summary>
+    public event Action<string>? ReconnectFailed;
+
+    /// <summary>Set by BattleController on the host at construction time (via
+    /// <see cref="CreateNetHost"/>). Used to validate incoming ReconnectRequest tokens. Null on
+    /// hotseat / client.</summary>
+    public Guid? SessionToken { get; set; }
+
     private readonly GameLoop? _hostLoop;
     private GameState _clientMirror = new();
     private readonly INetTransport? _transport;
@@ -184,7 +197,31 @@ public sealed class NetSession
             case ActionRejected rej when !IsHost:
                 ActionRejected?.Invoke(rej);
                 break;
-            // Handshake / Ping are lobby-layer concerns, not consumed by NetSession.
+            case ReconnectRequest rreq when IsHost:
+                HandleReconnectRequest(rreq, fromPeerId);
+                break;
+            case ReconnectAccepted racc when !IsHost:
+                _clientMirror = racc.State;
+                ReconnectCompleted?.Invoke();
+                break;
+            case ReconnectRejected rrej when !IsHost:
+                ReconnectFailed?.Invoke(rrej.Reason);
+                break;
+            // Handshake / Ping / StartGame are lobby-layer concerns, not consumed by NetSession.
         }
+    }
+
+    private void HandleReconnectRequest(ReconnectRequest req, int fromPeerId)
+    {
+        if (SessionToken is null || req.SessionToken != SessionToken.Value)
+        {
+            _transport?.Send(fromPeerId, new ReconnectRejected("Session token mismatch or session expired."));
+            return;
+        }
+        // Send fresh filtered snapshot to the new peer id, then flag completion.
+        var clientSide = LocalSide!.Value.Opponent();
+        var filteredState = _hostLoop!.State.FilterFor(clientSide);
+        _transport?.Send(fromPeerId, new ReconnectAccepted(filteredState, clientSide));
+        ReconnectCompleted?.Invoke();
     }
 }

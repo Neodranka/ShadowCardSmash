@@ -174,6 +174,36 @@ public class NetMessageJsonTests
         Assert.Equal(state.GetPlayer(PlayerSide.First).Health, clone.InitialState.GetPlayer(PlayerSide.First).Health);
     }
 
+    [Fact]
+    public void ReconnectRequest_RoundTrip()
+    {
+        var token = Guid.NewGuid();
+        var msg = new ReconnectRequest(token);
+        AssertRoundTrip(msg, "ReconnectRequest");
+        var clone = (ReconnectRequest)NetMessageJson.Deserialize(NetMessageJson.Serialize(msg));
+        Assert.Equal(token, clone.SessionToken);
+    }
+
+    [Fact]
+    public void ReconnectAccepted_RoundTrip_WithEmbeddedState()
+    {
+        var state = BuildSmallState();
+        var msg = new ReconnectAccepted(state, PlayerSide.Second);
+        AssertRoundTrip(msg, "ReconnectAccepted");
+        var clone = (ReconnectAccepted)NetMessageJson.Deserialize(NetMessageJson.Serialize(msg));
+        Assert.Equal(PlayerSide.Second, clone.AssignedSide);
+        Assert.Equal(state.TurnNumber, clone.State.TurnNumber);
+    }
+
+    [Fact]
+    public void ReconnectRejected_RoundTrip()
+    {
+        var msg = new ReconnectRejected("Session expired.");
+        AssertRoundTrip(msg, "ReconnectRejected");
+        var clone = (ReconnectRejected)NetMessageJson.Deserialize(NetMessageJson.Serialize(msg));
+        Assert.Equal("Session expired.", clone.Reason);
+    }
+
     private static GameState BuildSmallState()
     {
         var s = new GameState

@@ -160,6 +160,9 @@ public partial class MultiplayerLobbyController : Control
     {
         string addr = _addressInput.Text;
         int port = int.TryParse(_portInput.Text, out var p) ? p : NetSessionConfig.DefaultPort;
+        // Persist for Phase 7 reconnect attempts inside Battle scene.
+        BattleSetup.NetHostAddress = addr;
+        BattleSetup.NetHostPort = port;
         _transport.StartClient(addr, port);
         UpdateStatus($"连接 {addr}:{port}...");
         Log($"[client] connecting to {addr}:{port}");

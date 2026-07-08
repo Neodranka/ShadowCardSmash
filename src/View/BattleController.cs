@@ -102,9 +102,11 @@ public partial class BattleController : Node
         _fixedLocalSide = BattleSetup.NetLocalSide;
         _hasFixedLocalSide = true;
         _netSession = NetSession.CreateNetHost(_loop, transport, _fixedLocalSide);
+        _netSession.SessionToken = BattleSetup.NetSessionToken; // used to validate ReconnectRequest
         _netSession.ActionApplied += OnActionApplied;
         _netSession.ActionRejected += OnActionRejected;
         _netSession.PeerDisconnected += OnNetPeerDisconnected;
+        _netSession.ReconnectCompleted += OnReconnectCompleted;
         GD.Print($"[Battle] NetHost initialized, localSide={_fixedLocalSide}, transport.IsRunning={transport.IsRunning}");
         Rebind();
     }
@@ -120,6 +122,11 @@ public partial class BattleController : Node
         _netSession.ActionApplied += OnActionApplied;
         _netSession.ActionRejected += OnActionRejected;
         _netSession.PeerDisconnected += OnNetPeerDisconnected;
+        _netSession.ReconnectCompleted += OnReconnectCompleted;
+        _netSession.ReconnectFailed += OnReconnectFailed;
+        // Client also wires the raw transport.PeerConnected so it can fire ReconnectRequest as soon as
+        // the reconnect attempt establishes a fresh ENet peer.
+        transport.PeerConnected += OnClientTransportPeerConnected;
         GD.Print($"[Battle] NetClient initialized, localSide={_fixedLocalSide}, transport={transport.IsRunning}, initialTurn={initial.TurnNumber}, currentPlayer={initial.CurrentPlayer}");
         Rebind();
     }
@@ -132,6 +139,8 @@ public partial class BattleController : Node
 
     private bool _netPaused;
     private double _graceRemaining;
+    private double _reconnectAttemptCooldown; // client-only: interval throttle for reconnect
+    private const double ReconnectIntervalSeconds = 3.0;
     private Control? _pauseOverlay;
     private Label? _pauseLabel;
     private Button? _pauseBackBtn;
@@ -141,9 +150,51 @@ public partial class BattleController : Node
         if (_netPaused) return; // already showing grace overlay
         _netPaused = true;
         _graceRemaining = DisconnectGraceSeconds;
+        _reconnectAttemptCooldown = 0.5; // first attempt after half a second
         GD.Print($"[Battle] NetPeerDisconnected — entering {DisconnectGraceSeconds}s grace");
         BuildPauseOverlay();
         RefreshPauseLabel();
+    }
+
+    private void OnReconnectCompleted()
+    {
+        GD.Print("[Battle] ReconnectCompleted — clearing pause");
+        _netPaused = false;
+        _graceRemaining = 0;
+        if (_pauseOverlay != null) { _pauseOverlay.QueueFree(); _pauseOverlay = null; _pauseLabel = null; _pauseBackBtn = null; }
+        Rebind();
+    }
+
+    private void OnReconnectFailed(string reason)
+    {
+        GD.PrintErr($"[Battle] ReconnectFailed: {reason}");
+        // Fast-forward grace to zero — forfeit path.
+        _graceRemaining = 0;
+        RefreshPauseLabel();
+    }
+
+    private void OnClientTransportPeerConnected(int peerId)
+    {
+        // Only interesting during a reconnect attempt (peer initially connected via lobby, not here).
+        if (!_netPaused) return;
+        var token = BattleSetup.NetSessionToken;
+        if (token is null)
+        {
+            GD.PrintErr("[Battle] client reconnect fired but no NetSessionToken available");
+            return;
+        }
+        GD.Print($"[Battle] client reconnected to peer={peerId}, sending ReconnectRequest");
+        BattleSetup.NetTransport!.Send(peerId, new ReconnectRequest(token.Value));
+    }
+
+    private void TryClientReconnect()
+    {
+        var addr = BattleSetup.NetHostAddress;
+        int port = BattleSetup.NetHostPort;
+        if (string.IsNullOrEmpty(addr) || BattleSetup.NetTransport is null) return;
+        GD.Print($"[Battle] reconnect attempt to {addr}:{port}");
+        BattleSetup.NetTransport.StartClient(addr, port);
+        // On success, OnClientTransportPeerConnected fires and sends ReconnectRequest.
     }
 
     private void BuildPauseOverlay()
@@ -192,6 +243,17 @@ public partial class BattleController : Node
         _graceRemaining -= delta;
         if (_graceRemaining < 0) _graceRemaining = 0;
         RefreshPauseLabel();
+
+        // Client-only: periodic auto-reconnect while grace remains.
+        if (BattleSetup.Mode == BattleMode.NetClient && _graceRemaining > 0)
+        {
+            _reconnectAttemptCooldown -= delta;
+            if (_reconnectAttemptCooldown <= 0)
+            {
+                TryClientReconnect();
+                _reconnectAttemptCooldown = ReconnectIntervalSeconds;
+            }
+        }
     }
 
     private (IReadOnlyList<CardId> Cards, HeroClass HeroClass) ResolveSeat(DeckResource? deck, HeroClass fallbackClass)
