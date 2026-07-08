@@ -298,6 +298,17 @@ public partial class MultiplayerLobbyController : Control
             case StartGame sg:
                 Log($"[recv ← {fromId}] StartGame (you play {sg.ClientSide})");
                 UpdateStatus("收到游戏开始 — 进入战斗...");
+                // Client persists the session now so it can auto-reconnect after an app restart.
+                if (BattleSetup.NetSessionToken is { } tok)
+                {
+                    PersistedNetSession.Save(new PersistedNetSession
+                    {
+                        Token = tok,
+                        HostAddress = BattleSetup.NetHostAddress,
+                        HostPort = BattleSetup.NetHostPort,
+                        AssignedSide = sg.ClientSide,
+                    });
+                }
                 TransitionToBattle(BattleMode.NetClient, hostLoop: null,
                     initialState: sg.InitialState, localSide: sg.ClientSide);
                 break;

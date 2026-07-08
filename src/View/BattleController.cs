@@ -168,8 +168,9 @@ public partial class BattleController : Node
     private void OnReconnectFailed(string reason)
     {
         GD.PrintErr($"[Battle] ReconnectFailed: {reason}");
-        // Fast-forward grace to zero — forfeit path.
-        _graceRemaining = 0;
+        // Session is dead: don't let the user try again from main menu.
+        App.PersistedNetSession.Clear();
+        _graceRemaining = 0; // fast-forward grace to zero — forfeit path.
         RefreshPauseLabel();
     }
 
@@ -223,7 +224,12 @@ public partial class BattleController : Node
         vb.AddChild(_pauseLabel);
 
         _pauseBackBtn = new Button { Text = "返回主菜单", CustomMinimumSize = new Vector2(200, 44), Visible = false };
-        _pauseBackBtn.Pressed += () => GetTree().ChangeSceneToFile("res://scenes/MainMenu.tscn");
+        _pauseBackBtn.Pressed += () =>
+        {
+            // User accepted the forfeit — session is definitively over, clean the file.
+            App.PersistedNetSession.Clear();
+            GetTree().ChangeSceneToFile("res://scenes/MainMenu.tscn");
+        };
         vb.AddChild(_pauseBackBtn);
     }
 
@@ -670,6 +676,9 @@ public partial class BattleController : Node
                 await PlayAnimationFor(evt);
             ResetMode();
             Rebind();
+            // Game ended: kill any persisted resume file so main-menu doesn't offer a stale reconnect.
+            if (State.Result != Domain.GameResult.InProgress)
+                App.PersistedNetSession.Clear();
         }
         catch (Exception ex)
         {

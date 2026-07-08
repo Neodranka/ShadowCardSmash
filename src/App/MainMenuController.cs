@@ -36,6 +36,17 @@ public partial class MainMenuController : Control
 
         AddButton(vb, "Hot Seat", OnHotSeat);
         AddButton(vb, "Multiplayer (联机)", OnMultiplayer);
+        if (PersistedNetSession.Exists())
+        {
+            var resumeBtn = new Button
+            {
+                Text = "重连上一局 (Resume)",
+                CustomMinimumSize = new Vector2(280, 56),
+                Modulate = new Color(0.75f, 1.0f, 0.75f),
+            };
+            resumeBtn.Pressed += () => GetTree().ChangeSceneToFile("res://scenes/NetResume.tscn");
+            vb.AddChild(resumeBtn);
+        }
         AddButton(vb, "Network Test (Dev)", OnNetworkTest);
         AddButton(vb, "Deck Builder", OnDeckBuilder);
         AddButton(vb, "Quit", () => GetTree().Quit());
