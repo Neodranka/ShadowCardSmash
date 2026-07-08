@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="CardDataResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Cards/Resources/CardDataResource.cs" id="1_card"]
+
+[resource]
+script = ExtResource("1_card")
+Name = "议会秘书"
+Description = "每当你将一张牌洗入牌库时 +1/+1。"
+Cost = 2
+BaseAttack = 2
+BaseHealth = 2
+EvolvedAttack = 4
+EvolvedHealth = 4
+CardTypeEnum = 0
+HeroClassEnum = 2
+RarityEnum = 1
+TagsArray = PackedStringArray("人类", "摄政", "文书")
+InitialKeywordsFlags = 0
+InitialCountdownValue = -1
+ArtPath = ""
+IsLandmarkFlag = false

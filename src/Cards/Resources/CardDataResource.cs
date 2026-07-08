@@ -37,6 +37,9 @@ public partial class CardDataResource : Godot.Resource, ICardData
     [Export(PropertyHint.File, "*.png,*.jpg,*.svg,*.webp")]
     public string ArtPath { get; set; } = "";
 
+    /// <summary>Special amulet that goes to TerrainSlot (overwrites existing occupant).</summary>
+    [Export] public bool IsLandmarkFlag { get; set; }
+
     // ICardData wrappers — interface needs read-only access to the enums and richer types.
     CardType ICardData.CardType => CardTypeEnum;
     HeroClass ICardData.HeroClass => HeroClassEnum;
@@ -44,4 +47,5 @@ public partial class CardDataResource : Godot.Resource, ICardData
     IReadOnlyList<string> ICardData.Tags => TagsArray;
     Keyword ICardData.InitialKeywords => (Keyword)InitialKeywordsFlags;
     int ICardData.InitialCountdown => InitialCountdownValue;
+    bool ICardData.IsLandmark => IsLandmarkFlag;
 }

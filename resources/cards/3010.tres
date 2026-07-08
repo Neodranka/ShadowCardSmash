@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="CardDataResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Cards/Resources/CardDataResource.cs" id="1_card"]
+
+[resource]
+script = ExtResource("1_card")
+Name = "首席摄政 阿尔文大公"
+Description = "开幕：从卡组抽一张「摄政议会」；若我方场上已存在摄政议会，则改为洗任意张手牌回牌库并抽等量。进化时：从墓地选一张摄政牌返回手牌。"
+Cost = 3
+BaseAttack = 1
+BaseHealth = 1
+EvolvedAttack = 3
+EvolvedHealth = 3
+CardTypeEnum = 0
+HeroClassEnum = 2
+RarityEnum = 3
+TagsArray = PackedStringArray("人类", "公爵", "摄政")
+InitialKeywordsFlags = 0
+InitialCountdownValue = -1
+ArtPath = ""
+IsLandmarkFlag = false

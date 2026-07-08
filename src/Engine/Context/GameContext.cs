@@ -84,4 +84,25 @@ public sealed class GameContext
         => EffectPrimitives.DrawSpecificFromDeck(this, side, predicate);
     public int SummonUniqueFromDeck(PlayerSide side, System.Func<ICardScript, bool> predicate)
         => EffectPrimitives.SummonUniqueFromDeck(this, side, predicate);
+
+    // Wave-of-2025 primitives (deck/hand/graveyard cycling + counters)
+    public int DrawUntilHandFull(PlayerSide side) => EffectPrimitives.DrawUntilHandFull(this, side);
+    public void MillRestOfDeck(PlayerSide side) => EffectPrimitives.MillRestOfDeck(this, side);
+    public int DrawFromGraveyardRandom(PlayerSide side, int n) => EffectPrimitives.DrawFromGraveyardRandom(this, side, n);
+    public int DrawFromGraveyardUntilHandFull(PlayerSide side) => EffectPrimitives.DrawFromGraveyardUntilHandFull(this, side);
+    public void ReturnGraveyardToDeck(PlayerSide side) => EffectPrimitives.ReturnGraveyardToDeck(this, side);
+    public bool ReturnGraveyardCardToHand(RuntimeCard target) => EffectPrimitives.ReturnGraveyardCardToHand(this, target);
+    public void ShuffleHandToDeck(RuntimeCard card) => EffectPrimitives.ShuffleHandToDeck(this, card);
+    public void PutHandCardOnTopOfDeck(RuntimeCard card) => EffectPrimitives.PutHandCardOnTopOfDeck(this, card);
+    public void RefundMana(PlayerSide side, int amount, string source = "effect")
+        => EffectPrimitives.RefundMana(this, side, amount, source);
+    public void GrantMana(PlayerSide side, int amount, string source = "effect")
+        => EffectPrimitives.GrantMana(this, side, amount, source);
+    public void RevealCard(RuntimeCard card) => EffectPrimitives.RevealCard(this, card);
+    public int DestroyRandomEnemyMinions(PlayerSide side, int n)
+        => EffectPrimitives.DestroyRandomEnemyMinions(this, side, n);
+    public void ChangePlayerCounter(PlayerSide side, string key, int delta)
+        => EffectPrimitives.ChangePlayerCounter(this, side, key, delta);
+    public int ConsumePlayerCounter(PlayerSide side, string key)
+        => EffectPrimitives.ConsumePlayerCounter(this, side, key);
 }

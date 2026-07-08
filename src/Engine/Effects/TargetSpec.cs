@@ -18,4 +18,9 @@ public enum TargetSpec
     AllyPlayer,
     EmptyAllyTile,
     EmptyEnemyTile,
+    /// <summary>0..N cards from own hand (multi-select popup). Used by 塔尔莫维奇商队, 摄政议会,
+    /// 拖延议程 etc. The actual selection count comes from ExtraTargets length at submit time.</summary>
+    MultipleFromHand,
+    /// <summary>Single card from own graveyard. Used by 阿尔文大公 OnEvolve.</summary>
+    SingleAllyGraveyardCard,
 }

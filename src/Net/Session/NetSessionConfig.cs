@@ -18,7 +18,12 @@ public static class NetSessionConfig
     //                CardDrawnEvent for the opponent. Wire format compatible but semantic contract
     //                changed: clients now never see opponent's private CardIds.
     // V5 (Phase 7):  added ReconnectRequest / ReconnectAccepted / ReconnectRejected.
-    public const int ProtocolVersion = 5;
+    // V6 (帝国摄政/塔尔莫维奇 wave): new ActivateAction; new events (CardRevealed / ManaGained /
+    //                PlayerCounterChanged / CardShuffledIntoDeck / DeckMilled); new PlayerState fields
+    //                (Counters / CardsPlayedCount / NextTurnBonusDraws / FatigueRedirected);
+    //                new RuntimeCard field (Counters); new TargetSpecs (MultipleFromHand / SingleAllyGraveyardCard);
+    //                new ICardScript flags (IsLandmark / CanActivate / ActivateCost).
+    public const int ProtocolVersion = 6;
     public const int DefaultPort = 49321;
     public const int MaxPlayers = 2;        // V1: strictly 1v1; lobby slots are hardcoded to host + 1 client.
 }

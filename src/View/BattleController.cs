@@ -326,6 +326,20 @@ public partial class BattleController : Node
         _selectedCardId = card.Card;
         _selectedSpec = script.PlayTarget;
 
+        // Landmark = special Amulet: skip tile pick, auto-target TerrainSlot (overwrites existing).
+        // Also handle MultipleFromHand landmarks (摄政议会).
+        if (script.CardType == CardType.Amulet && script.IsLandmark)
+        {
+            _pendingTileIndex = PlayerState.TerrainSlotIndex;
+            if (script.PlayTarget == TargetSpec.MultipleFromHand)
+            {
+                OpenHandMultiSelectFor(script, card.Instance);
+                return;
+            }
+            TrySubmit(new PlayCardAction(LocalSide, card.Instance, PlayerState.TerrainSlotIndex, null, null));
+            return;
+        }
+
         if (script.CardType == CardType.Minion || script.CardType == CardType.Amulet)
         {
             _mode = Mode.AwaitPlayTarget;
@@ -355,7 +369,32 @@ public partial class BattleController : Node
             return;
         }
 
+        // MultipleFromHand: open the hand multi-select popup instead of the normal target pick.
+        if (_selectedSpec == TargetSpec.MultipleFromHand)
+        {
+            OpenHandMultiSelectFor(script, card.Instance);
+            return;
+        }
+
         BeginSpellTargetPick(script.PlayTarget, script.TargetsToPick, script.Name, card.Instance);
+    }
+
+    private void OpenHandMultiSelectFor(ICardScript script, InstanceId cardInstance)
+    {
+        _mode = Mode.AwaitPlayTarget;
+        _board.PinDetail(cardInstance);
+        int max = script.TargetsToPick > 0 && script.TargetsToPick < int.MaxValue ? script.TargetsToPick : int.MaxValue;
+        var popup = new HandMultiSelectPopup();
+        AddChild(popup);
+        popup.Populate($"{script.Name} — 选择手牌", State.GetPlayer(LocalSide).Hand, _registry,
+            minPick: 0, maxPick: max, excludeInstance: cardInstance);
+        popup.Confirmed += ids =>
+        {
+            _pickedTargets.Clear();
+            foreach (var id in ids) _pickedTargets.Add(new InstanceId(id));
+            SubmitPlayCard();
+        };
+        popup.Cancelled += () => ResetMode();
     }
 
     private void OpenChoicePopup(ICardScript script)
@@ -433,6 +472,13 @@ public partial class BattleController : Node
                     }
                     if (script.PlayTarget != TargetSpec.None && _pendingTileIndex is null)
                     {
+                        // MultipleFromHand → open the hand-multi-select popup instead of tile-based target picking.
+                        if (script.PlayTarget == TargetSpec.MultipleFromHand)
+                        {
+                            _pendingTileIndex = tileIndex;
+                            OpenHandMultiSelectFor(script, _selectedHandInstance);
+                            return;
+                        }
                         // No valid targets on board → skip the target-pick sub-state and play directly.
                         // OnPlay sees PickedTarget=null and exits early (规则：算作未触发开幕).
                         if (!HasAnyValidTarget(script.PlayTarget))
@@ -504,7 +550,31 @@ public partial class BattleController : Node
 
         if (side == LocalSide)
         {
-            var attacker = State.GetPlayer(side).FindOnField(instance);
+            // Check FieldOrTerrain — landmarks live in TerrainSlot, and they may be activatable.
+            var mePlayer = State.GetPlayer(side);
+            var occupant = mePlayer.FindOnFieldOrTerrain(instance);
+            if (occupant is null) return;
+            var occScript = _registry.Get(occupant.Card);
+
+            // Activate ability: if this card has one and player has mana + no CD, submit ActivateAction.
+            if (occScript.CanActivate)
+            {
+                if (mePlayer.Mana < occScript.ActivateCost)
+                {
+                    _board.SetStatus($"启动 {occScript.Name} 需要 {occScript.ActivateCost} 费");
+                    return;
+                }
+                occupant.Counters.TryGetValue("activate_cd", out int cd);
+                if (cd > 0)
+                {
+                    _board.SetStatus($"{occScript.Name} 冷却中（{cd} 回合）");
+                    return;
+                }
+                TrySubmit(new ActivateAction(LocalSide, instance));
+                return;
+            }
+
+            var attacker = mePlayer.FindOnField(instance);
             if (attacker is null) return;
 
             string? blocker = DiagnoseAttackBlocker(attacker);
@@ -825,6 +895,8 @@ public partial class BattleController : Node
                                             || enemy.Field.Any(t => t.Occupant is not null),
             TargetSpec.EmptyAllyTile        => me.Field.Any(t => t.Occupant is null),
             TargetSpec.EmptyEnemyTile       => enemy.Field.Any(t => t.Occupant is null),
+            TargetSpec.MultipleFromHand     => true,  // 0 selections is legal — always "valid"
+            TargetSpec.SingleAllyGraveyardCard => me.Graveyard.Count > 0,
             // Characters always include heroes — never empty.
             _ => true,
         };

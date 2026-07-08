@@ -25,4 +25,6 @@ public interface ICardData
     Keyword InitialKeywords { get; }
     int InitialCountdown { get; }
     string ArtPath { get; }
+    /// <summary>True = special Amulet that goes to TerrainSlot and overwrites any existing occupant.</summary>
+    bool IsLandmark { get; }
 }

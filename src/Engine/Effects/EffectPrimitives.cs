@@ -110,13 +110,16 @@ public static class EffectPrimitives
     public static void Draw(GameContext ctx, PlayerSide side, int count)
     {
         var p = ctx.State.GetPlayer(side);
+        int actuallyDrawn = 0;
         for (int i = 0; i < count; i++)
         {
             if (p.Deck.Count == 0)
             {
                 p.FatigueCounter++;
                 ctx.Loop.Publish(new FatigueEvent(side, p.FatigueCounter), ctx);
-                DamagePlayer(ctx, side, p.FatigueCounter);
+                // 摄政议会 (≥30 议案) redirects fatigue: the opponent eats the hits instead.
+                var fatigueTarget = p.FatigueRedirected ? side.Opponent() : side;
+                DamagePlayer(ctx, fatigueTarget, p.FatigueCounter);
                 if (ctx.State.Result != GameResult.InProgress) return;
                 continue;
             }
@@ -134,8 +137,204 @@ public static class EffectPrimitives
                 card.Zone = Zone.Hand;
                 p.Hand.Add(card);
                 ctx.Loop.Publish(new CardDrawnEvent(side, card.Instance, card.Card), ctx);
+                actuallyDrawn++;
             }
         }
+        if (actuallyDrawn > 0) DispatchOwnerCardsDrawnBatch(ctx, side, actuallyDrawn);
+    }
+
+    /// <summary>Draw from deck until hand is full. 其余牌库牌不算抽 — 走 MillRestOfDeck 单独处理。</summary>
+    public static int DrawUntilHandFull(GameContext ctx, PlayerSide side)
+    {
+        var p = ctx.State.GetPlayer(side);
+        int target = PlayerState.HandLimit - p.Hand.Count;
+        if (target <= 0) return 0;
+        int before = p.Hand.Count;
+        Draw(ctx, side, target);
+        return p.Hand.Count - before;
+    }
+
+    /// <summary>Move remaining deck cards to graveyard (not a draw). 紧急议案 tail.</summary>
+    public static void MillRestOfDeck(GameContext ctx, PlayerSide side)
+    {
+        var p = ctx.State.GetPlayer(side);
+        int count = p.Deck.Count;
+        if (count == 0) return;
+        for (int i = p.Deck.Count - 1; i >= 0; i--)
+        {
+            var card = p.Deck[i];
+            card.Zone = Zone.Graveyard;
+            p.Graveyard.Add(card);
+        }
+        p.Deck.Clear();
+        ctx.Loop.Publish(new DeckMilledEvent(side, count), ctx);
+    }
+
+    /// <summary>Random draw from graveyard. n draws; each pick uses ctx.Rng. Stops if graveyard empty.
+    /// 复议 core. Cards drawn count toward CardDrawnEvent (triggers 会议记录员).</summary>
+    public static int DrawFromGraveyardRandom(GameContext ctx, PlayerSide side, int n)
+    {
+        var p = ctx.State.GetPlayer(side);
+        int drawn = 0;
+        for (int i = 0; i < n; i++)
+        {
+            if (p.Graveyard.Count == 0) break;
+            if (p.Hand.Count >= PlayerState.HandLimit) break;
+            int idx = ctx.Rng.Next(0,p.Graveyard.Count);
+            var card = p.Graveyard[idx];
+            p.Graveyard.RemoveAt(idx);
+            card.Zone = Zone.Hand;
+            p.Hand.Add(card);
+            ctx.Loop.Publish(new CardDrawnEvent(side, card.Instance, card.Card), ctx);
+            drawn++;
+        }
+        if (drawn > 0) DispatchOwnerCardsDrawnBatch(ctx, side, drawn);
+        return drawn;
+    }
+
+    /// <summary>Draw graveyard cards randomly until hand full. Returns drawn count. 复议 body.</summary>
+    public static int DrawFromGraveyardUntilHandFull(GameContext ctx, PlayerSide side)
+    {
+        var p = ctx.State.GetPlayer(side);
+        int target = PlayerState.HandLimit - p.Hand.Count;
+        if (target <= 0) return 0;
+        return DrawFromGraveyardRandom(ctx, side, target);
+    }
+
+    /// <summary>Move all remaining graveyard cards back into the deck (shuffle position). 复议 tail.</summary>
+    public static void ReturnGraveyardToDeck(GameContext ctx, PlayerSide side)
+    {
+        var p = ctx.State.GetPlayer(side);
+        int moved = p.Graveyard.Count;
+        if (moved == 0) return;
+        foreach (var c in p.Graveyard)
+        {
+            c.Zone = Zone.Deck;
+            // Insert at random position for deterministic shuffle-in-place.
+            int idx = ctx.Rng.Next(0,p.Deck.Count + 1);
+            p.Deck.Insert(idx, c);
+        }
+        p.Graveyard.Clear();
+        // Zone changes are internal; a single aggregate event is enough for animation.
+        ctx.Loop.Publish(new CardZoneChangedEvent(new InstanceId(0), Zone.Graveyard, Zone.Deck), ctx);
+    }
+
+    /// <summary>Return a specific graveyard card to hand (阿尔文 OnEvolve).</summary>
+    public static bool ReturnGraveyardCardToHand(GameContext ctx, RuntimeCard target)
+    {
+        var p = ctx.State.GetPlayer(target.Owner);
+        if (!p.Graveyard.Remove(target)) return false;
+        if (p.Hand.Count >= PlayerState.HandLimit)
+        {
+            p.Graveyard.Add(target);
+            return false; // 手上限已满就啥都不做（不放墓地不放弃）
+        }
+        target.Zone = Zone.Hand;
+        p.Hand.Add(target);
+        ctx.Loop.Publish(new CardZoneChangedEvent(target.Instance, Zone.Graveyard, Zone.Hand), ctx);
+        return true;
+    }
+
+    /// <summary>Shuffle a hand card back into deck. Triggers OnOwnerCardShuffledIntoDeck for the owner's
+    /// field minions (议会秘书). Insertion position is randomized via ctx.Rng.</summary>
+    public static void ShuffleHandToDeck(GameContext ctx, RuntimeCard card)
+    {
+        var p = ctx.State.GetPlayer(card.Owner);
+        if (!p.Hand.Remove(card)) return;
+        card.Zone = Zone.Deck;
+        int idx = ctx.Rng.Next(0,p.Deck.Count + 1);
+        p.Deck.Insert(idx, card);
+        ctx.Loop.Publish(new CardShuffledIntoDeckEvent(card.Instance, card.Card, card.Owner), ctx);
+        DispatchOwnerCardShuffledIntoDeck(ctx, card);
+    }
+
+    /// <summary>Put a hand card on top of the deck (last index in our list = draw target). 权衡 branch B.</summary>
+    public static void PutHandCardOnTopOfDeck(GameContext ctx, RuntimeCard card)
+    {
+        var p = ctx.State.GetPlayer(card.Owner);
+        if (!p.Hand.Remove(card)) return;
+        card.Zone = Zone.Deck;
+        p.Deck.Add(card); // last index = top per Draw() convention
+        ctx.Loop.Publish(new CardShuffledIntoDeckEvent(card.Instance, card.Card, card.Owner), ctx);
+        DispatchOwnerCardShuffledIntoDeck(ctx, card);
+    }
+
+    /// <summary>Refund mana: capped at current MaxMana. Fires ManaGainedEvent + OnOwnerManaGained.</summary>
+    public static void RefundMana(GameContext ctx, PlayerSide side, int amount, string source)
+    {
+        if (amount <= 0) return;
+        var p = ctx.State.GetPlayer(side);
+        int newMana = Math.Min(p.MaxMana, p.Mana + amount);
+        int gained = newMana - p.Mana;
+        p.Mana = newMana;
+        if (gained > 0)
+        {
+            ctx.Loop.Publish(new ManaChangedEvent(side, p.Mana, p.MaxMana), ctx);
+            ctx.Loop.Publish(new ManaGainedEvent(side, gained, source), ctx);
+            DispatchOwnerManaGained(ctx, side, gained, source);
+        }
+    }
+
+    /// <summary>Grant mana: not capped at MaxMana (can exceed, but hard cap at ManaMax=10).
+    /// Fires ManaGainedEvent + OnOwnerManaGained.</summary>
+    public static void GrantMana(GameContext ctx, PlayerSide side, int amount, string source)
+    {
+        if (amount <= 0) return;
+        var p = ctx.State.GetPlayer(side);
+        int newMana = Math.Min(GameState.ManaMax, p.Mana + amount);
+        int gained = newMana - p.Mana;
+        p.Mana = newMana;
+        if (gained > 0)
+        {
+            ctx.Loop.Publish(new ManaChangedEvent(side, p.Mana, p.MaxMana), ctx);
+            ctx.Loop.Publish(new ManaGainedEvent(side, gained, source), ctx);
+            DispatchOwnerManaGained(ctx, side, gained, source);
+        }
+    }
+
+    /// <summary>Briefly flip a hand card face-up to both sides (玛丽斯卡 compare).</summary>
+    public static void RevealCard(GameContext ctx, RuntimeCard card)
+    {
+        ctx.Loop.Publish(new CardRevealedEvent(card.Instance, card.Card, card.Owner), ctx);
+    }
+
+    /// <summary>Random-destroy N enemy minions (玛丽斯卡 win branch).</summary>
+    public static int DestroyRandomEnemyMinions(GameContext ctx, PlayerSide side, int n)
+    {
+        var enemy = ctx.State.GetPlayer(side.Opponent());
+        var candidates = new List<RuntimeCard>();
+        foreach (var t in enemy.Field)
+            if (t.Occupant is { } m) candidates.Add(m);
+        int destroyed = 0;
+        for (int i = 0; i < n && candidates.Count > 0; i++)
+        {
+            int idx = ctx.Rng.Next(0,candidates.Count);
+            var target = candidates[idx];
+            candidates.RemoveAt(idx);
+            Destroy(ctx, target);
+            destroyed++;
+        }
+        return destroyed;
+    }
+
+    /// <summary>Bump a player-side counter (议案). Emits PlayerCounterChangedEvent.</summary>
+    public static void ChangePlayerCounter(GameContext ctx, PlayerSide side, string key, int delta)
+    {
+        var p = ctx.State.GetPlayer(side);
+        p.Counters.TryGetValue(key, out int cur);
+        int next = Math.Max(0, cur + delta);
+        p.Counters[key] = next;
+        ctx.Loop.Publish(new PlayerCounterChangedEvent(side, key, next), ctx);
+    }
+
+    /// <summary>Set player-side counter to zero (used by 摄政议会 activation).</summary>
+    public static int ConsumePlayerCounter(GameContext ctx, PlayerSide side, string key)
+    {
+        var p = ctx.State.GetPlayer(side);
+        if (!p.Counters.TryGetValue(key, out int cur) || cur == 0) return 0;
+        p.Counters[key] = 0;
+        ctx.Loop.Publish(new PlayerCounterChangedEvent(side, key, 0), ctx);
+        return cur;
     }
 
     public static void Discard(GameContext ctx, PlayerSide side, RuntimeCard card)
@@ -451,5 +650,46 @@ public static class EffectPrimitives
                 script.OnFieldMinionBarrierLost(ctx.WithSource(m), target);
             }
         }
+    }
+
+    /// <summary>Fire OnOwnerCardsDrawnBatch on every field card belonging to <paramref name="side"/>.
+    /// Fires exactly ONCE regardless of draw count (会议记录员 rule).</summary>
+    public static void DispatchOwnerCardsDrawnBatch(GameContext ctx, PlayerSide side, int count)
+    {
+        var p = ctx.State.GetPlayer(side);
+        foreach (var tile in p.Field)
+        {
+            if (tile.Occupant is not { } m) continue;
+            if (m.IsSilenced) continue;
+            ctx.CardDatabase.Get(m.Card).OnOwnerCardsDrawnBatch(ctx.WithSource(m), count);
+        }
+        if (p.TerrainSlot.Occupant is { } tocc && !tocc.IsSilenced)
+            ctx.CardDatabase.Get(tocc.Card).OnOwnerCardsDrawnBatch(ctx.WithSource(tocc), count);
+    }
+
+    public static void DispatchOwnerCardShuffledIntoDeck(GameContext ctx, RuntimeCard shuffled)
+    {
+        var p = ctx.State.GetPlayer(shuffled.Owner);
+        foreach (var tile in p.Field)
+        {
+            if (tile.Occupant is not { } m) continue;
+            if (m.IsSilenced) continue;
+            ctx.CardDatabase.Get(m.Card).OnOwnerCardShuffledIntoDeck(ctx.WithSource(m), shuffled);
+        }
+        if (p.TerrainSlot.Occupant is { } tocc && !tocc.IsSilenced)
+            ctx.CardDatabase.Get(tocc.Card).OnOwnerCardShuffledIntoDeck(ctx.WithSource(tocc), shuffled);
+    }
+
+    public static void DispatchOwnerManaGained(GameContext ctx, PlayerSide side, int amount, string source)
+    {
+        var p = ctx.State.GetPlayer(side);
+        foreach (var tile in p.Field)
+        {
+            if (tile.Occupant is not { } m) continue;
+            if (m.IsSilenced) continue;
+            ctx.CardDatabase.Get(m.Card).OnOwnerManaGained(ctx.WithSource(m), amount, source);
+        }
+        if (p.TerrainSlot.Occupant is { } tocc && !tocc.IsSilenced)
+            ctx.CardDatabase.Get(tocc.Card).OnOwnerManaGained(ctx.WithSource(tocc), amount, source);
     }
 }

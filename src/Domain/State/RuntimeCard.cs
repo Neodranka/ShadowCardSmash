@@ -29,6 +29,9 @@ public sealed class RuntimeCard
     /// <summary>If true, the OnDeath hook is skipped (used by spawned copies that "lose 谢幕").</summary>
     public bool OnDeathSuppressed;
 
+    /// <summary>Extensible per-card counters. Reserved for future card-side counter effects.</summary>
+    public Dictionary<string, int> Counters = new();
+
     public RuntimeCard Clone()
     {
         var copy = new RuntimeCard
@@ -51,6 +54,7 @@ public sealed class RuntimeCard
             OnDeathSuppressed = OnDeathSuppressed,
         };
         foreach (var buff in Buffs) copy.Buffs.Add(buff.Clone());
+        foreach (var kv in Counters) copy.Counters[kv.Key] = kv.Value;
         return copy;
     }
 

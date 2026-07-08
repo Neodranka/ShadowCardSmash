@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="CardDataResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Cards/Resources/CardDataResource.cs" id="1_card"]
+
+[resource]
+script = ExtResource("1_card")
+Name = "征召兵"
+Description = "攻击时获得 +2/+0。"
+Cost = 1
+BaseAttack = 1
+BaseHealth = 1
+EvolvedAttack = 3
+EvolvedHealth = 3
+CardTypeEnum = 0
+HeroClassEnum = 2
+RarityEnum = 0
+TagsArray = PackedStringArray("人类", "士兵")
+InitialKeywordsFlags = 0
+InitialCountdownValue = -1
+ArtPath = ""
+IsLandmarkFlag = false

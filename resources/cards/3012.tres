@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="CardDataResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Cards/Resources/CardDataResource.cs" id="1_card"]
+
+[resource]
+script = ExtResource("1_card")
+Name = "投机者 玛丽斯卡·塔尔莫维奇"
+Description = "开幕：敌我双方各抽一张牌并展示。若我方费用大于敌方，则随机破坏 2 个敌方随从；若小于等于敌方，则回复 2 点费用。"
+Cost = 5
+BaseAttack = 2
+BaseHealth = 3
+EvolvedAttack = 4
+EvolvedHealth = 5
+CardTypeEnum = 0
+HeroClassEnum = 2
+RarityEnum = 3
+TagsArray = PackedStringArray("人类", "公爵", "商人", "塔尔莫维奇")
+InitialKeywordsFlags = 0
+InitialCountdownValue = -1
+ArtPath = ""
+IsLandmarkFlag = false

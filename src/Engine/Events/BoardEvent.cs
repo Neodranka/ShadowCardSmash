@@ -49,6 +49,11 @@ namespace ShadowCardSmash.Engine;
 [JsonDerivedType(typeof(TileEffectAppliedEvent),       "TileEffectApplied")]
 [JsonDerivedType(typeof(PlayerPickRequestEvent),       "PlayerPickRequest")]
 [JsonDerivedType(typeof(MulliganConfirmedEvent),       "MulliganConfirmed")]
+[JsonDerivedType(typeof(CardRevealedEvent),            "CardRevealed")]
+[JsonDerivedType(typeof(ManaGainedEvent),              "ManaGained")]
+[JsonDerivedType(typeof(PlayerCounterChangedEvent),    "PlayerCounterChanged")]
+[JsonDerivedType(typeof(CardShuffledIntoDeckEvent),    "CardShuffledIntoDeck")]
+[JsonDerivedType(typeof(DeckMilledEvent),              "DeckMilled")]
 public abstract record BoardEvent
 {
     public int Sequence { get; init; }
@@ -100,3 +105,19 @@ public sealed record TileEffectAppliedEvent(PlayerSide Side, int TileIndex, stri
 
 public sealed record PlayerPickRequestEvent(PlayerSide Side, string Reason) : BoardEvent;
 public sealed record MulliganConfirmedEvent(PlayerSide Side, int[] SwappedIndices) : BoardEvent;
+
+/// <summary>Fired when a card in hand is briefly flipped face-up to both players (玛丽斯卡's compare).</summary>
+public sealed record CardRevealedEvent(InstanceId Instance, CardId Card, PlayerSide Owner) : BoardEvent;
+
+/// <summary>Fired by Refund/Grant mana primitives. Turn-start refill uses ManaChangedEvent only —
+/// so listeners like 塔尔莫维奇财务官 fire on 3/6/回合外获取 but not on 每回合起始的正常涨费.</summary>
+public sealed record ManaGainedEvent(PlayerSide Side, int Amount, string Source) : BoardEvent;
+
+/// <summary>Fired when PlayerState.Counters[Key] changes (e.g., "regency" for 议案 layers).</summary>
+public sealed record PlayerCounterChangedEvent(PlayerSide Side, string Key, int NewValue) : BoardEvent;
+
+/// <summary>Fired when a hand card is placed back into deck (通用洗入). Triggers 议会秘书.</summary>
+public sealed record CardShuffledIntoDeckEvent(InstanceId Instance, CardId Card, PlayerSide Side) : BoardEvent;
+
+/// <summary>Fired when N cards are moved from deck to graveyard in bulk (紧急议案). Not a draw.</summary>
+public sealed record DeckMilledEvent(PlayerSide Side, int Count) : BoardEvent;

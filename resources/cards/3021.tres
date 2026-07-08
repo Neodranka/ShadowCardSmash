@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="CardDataResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Cards/Resources/CardDataResource.cs" id="1_card"]
+
+[resource]
+script = ExtResource("1_card")
+Name = "拖延议程"
+Description = "选择一张手牌洗回牌库，下回合开始时额外抽 2 张。可叠加。"
+Cost = 0
+BaseAttack = 0
+BaseHealth = 0
+EvolvedAttack = 0
+EvolvedHealth = 0
+CardTypeEnum = 1
+HeroClassEnum = 2
+RarityEnum = 1
+TagsArray = PackedStringArray("摄政")
+InitialKeywordsFlags = 0
+InitialCountdownValue = -1
+ArtPath = ""
+IsLandmarkFlag = false

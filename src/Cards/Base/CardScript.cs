@@ -45,6 +45,12 @@ public abstract class CardScript : ICardScript
     public virtual Keyword InitialKeywords => Data?.InitialKeywords ?? Keyword.None;
     public virtual int InitialCountdown => Data?.InitialCountdown ?? -1;
     public virtual string ArtPath => Data?.ArtPath ?? "";
+    public virtual bool IsLandmark => Data?.IsLandmark ?? false;
+
+    /// <summary>True = card has a player-triggered activate ability that spends <see cref="ActivateCost"/>
+    /// mana. Default false; override on landmarks (摄政议会) or minions with startup abilities (财务官).</summary>
+    public virtual bool CanActivate => false;
+    public virtual int ActivateCost => 0;
 
     protected CardScript()
     {
@@ -67,4 +73,7 @@ public abstract class CardScript : ICardScript
     public virtual void OnSelfBarrierLost(GameContext ctx) { }
     public virtual void OnFieldMinionEntered(GameContext ctx, RuntimeCard newcomer) { }
     public virtual void OnFieldMinionBarrierLost(GameContext ctx, RuntimeCard target) { }
+    public virtual void OnOwnerCardsDrawnBatch(GameContext ctx, int count) { }
+    public virtual void OnOwnerCardShuffledIntoDeck(GameContext ctx, RuntimeCard shuffledCard) { }
+    public virtual void OnOwnerManaGained(GameContext ctx, int amount, string source) { }
 }

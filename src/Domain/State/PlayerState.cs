@@ -38,6 +38,22 @@ public sealed class PlayerState
     public int TotalSelfDamage;
     public int SelfDamageCount;
 
+    /// <summary>Extensible player-side counters (e.g., "regency" for 议案 layers). Persists across
+    /// landmark destruction; only the card that consumed it can clear it.</summary>
+    public Dictionary<string, int> Counters = new();
+
+    /// <summary>Per-CardId lifetime play count for this player. Used by cards that check "if you've
+    /// played more than N of X" (e.g., 摄政议会 stacked-play clause).</summary>
+    public Dictionary<int, int> CardsPlayedCount = new();
+
+    /// <summary>Extra draws to run at the start of your next turn (after mana refill, before normal
+    /// draw). 拖延议程 accumulates into this; consumed once and reset to 0.</summary>
+    public int NextTurnBonusDraws;
+
+    /// <summary>Set by 摄政议会's ≥30 议案 activation: for the rest of the game, fatigue damage taken
+    /// by this side is instead redirected to the opponent.</summary>
+    public bool FatigueRedirected;
+
     private static TileState[] CreateEmptyField()
     {
         var f = new TileState[FieldSize];
@@ -100,6 +116,8 @@ public sealed class PlayerState
             TotalSelfDamage = TotalSelfDamage,
             SelfDamageCount = SelfDamageCount,
             BarrierStacks = BarrierStacks,
+            NextTurnBonusDraws = NextTurnBonusDraws,
+            FatigueRedirected = FatigueRedirected,
         };
         foreach (var c in Deck) copy.Deck.Add(c.Clone());
         foreach (var c in Hand) copy.Hand.Add(c.Clone());
@@ -107,6 +125,8 @@ public sealed class PlayerState
         copy.TerrainSlot = TerrainSlot.Clone();
         foreach (var c in Graveyard) copy.Graveyard.Add(c.Clone());
         foreach (var c in Vanished) copy.Vanished.Add(c.Clone());
+        foreach (var kv in Counters) copy.Counters[kv.Key] = kv.Value;
+        foreach (var kv in CardsPlayedCount) copy.CardsPlayedCount[kv.Key] = kv.Value;
         return copy;
     }
 }

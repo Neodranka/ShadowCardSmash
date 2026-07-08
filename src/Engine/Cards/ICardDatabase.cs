@@ -48,6 +48,12 @@ public interface ICardScript
     Keyword InitialKeywords { get; }
     int InitialCountdown { get; }
     string ArtPath { get; }
+    /// <summary>Landmark = special Amulet whose target slot is TerrainSlot; playing overwrites any
+    /// existing occupant of that slot (existing terrain/landmark gets destroyed to graveyard first).</summary>
+    bool IsLandmark { get; }
+    /// <summary>True = card has a player-triggered activate ability (spends ActivateCost mana).</summary>
+    bool CanActivate { get; }
+    int ActivateCost { get; }
 
     // Engine-side hook invocations. Most card scripts override only a few.
     void OnPlay(GameContext ctx);
@@ -66,4 +72,17 @@ public interface ICardScript
     void OnFieldMinionEntered(GameContext ctx, RuntimeCard newcomer);
     /// <summary>Fired on every field card OTHER than the target when a minion loses its last barrier stack.</summary>
     void OnFieldMinionBarrierLost(GameContext ctx, RuntimeCard target);
+
+    /// <summary>Fired on every field card belonging to <paramref name="side"/> after a draw operation
+    /// completes. count = number of cards actually drawn (not milled). Fires once per draw call
+    /// regardless of count (会议记录员's rule).</summary>
+    void OnOwnerCardsDrawnBatch(GameContext ctx, int count);
+
+    /// <summary>Fired on every field card belonging to the shuffled card's owner when a hand card is
+    /// moved back into the deck. Triggers 议会秘书.</summary>
+    void OnOwnerCardShuffledIntoDeck(GameContext ctx, RuntimeCard shuffledCard);
+
+    /// <summary>Fired on every field card belonging to <paramref name="side"/> when mana is gained
+    /// via Refund/Grant (NOT turn-start refill). Triggers 塔尔莫维奇财务官.</summary>
+    void OnOwnerManaGained(GameContext ctx, int amount, string source);
 }

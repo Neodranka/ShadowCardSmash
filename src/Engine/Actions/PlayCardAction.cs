@@ -44,15 +44,18 @@ public sealed record PlayCardAction(
         switch (script.CardType)
         {
             case CardType.Minion:
-            case CardType.Amulet:
+            case CardType.Amulet when !script.IsLandmark:
                 if (!TileIndex.HasValue) throw new InvalidActionException("需要指定一个格子");
                 if (TileIndex.Value < 0 || TileIndex.Value >= PlayerState.FieldSize)
                     throw new InvalidActionException("格子序号越界");
                 if (!p.Field[TileIndex.Value].IsEmpty) throw new InvalidActionException("该格子已被占据");
                 break;
+            case CardType.Amulet when script.IsLandmark:
             case CardType.Terrain:
-                // Terrain ignores TileIndex; always lands in the dedicated TerrainSlot.
-                if (!p.TerrainSlot.IsEmpty) throw new InvalidActionException("场地槽位已被占据");
+                // Landmark or Terrain: always land in TerrainSlot. Terrain requires empty; Landmark
+                // overwrites (destroys existing occupant first, in Apply).
+                if (script.CardType == CardType.Terrain && !p.TerrainSlot.IsEmpty)
+                    throw new InvalidActionException("场地槽位已被占据");
                 break;
             case CardType.Spell:
                 ValidateSpellTarget(state, script);
@@ -63,6 +66,9 @@ public sealed record PlayCardAction(
         p.Mana -= effectiveCost;
         p.Hand.Remove(card);
         ctx.IsEnhanced = isEnhanced;
+        // Track lifetime plays per CardId for cards that check "if you've played N of X" (e.g., 摄政议会).
+        p.CardsPlayedCount.TryGetValue(card.Card.Value, out int prevCount);
+        p.CardsPlayedCount[card.Card.Value] = prevCount + 1;
         ctx.Loop.Publish(new ManaChangedEvent(Issuer, p.Mana, p.MaxMana), ctx);
         ctx.Loop.Publish(new CardPlayedEvent(Issuer, card.Instance, card.Card), ctx);
 
@@ -97,9 +103,15 @@ public sealed record PlayCardAction(
             card.SummonedThisTurn = true;
 
             int idx;
-            if (script.CardType == CardType.Terrain)
+            bool goesToTerrainSlot = script.CardType == CardType.Terrain
+                                   || (script.CardType == CardType.Amulet && script.IsLandmark);
+            if (goesToTerrainSlot)
             {
                 idx = PlayerState.TerrainSlotIndex;
+                // Landmark overwrite: destroy any existing occupant before placing (Terrain path was
+                // already checked in Validate — TerrainSlot must be empty for CardType.Terrain).
+                if (script.IsLandmark && p.TerrainSlot.Occupant is { } existing)
+                    EffectPrimitives.Destroy(ctx, existing);
                 p.TerrainSlot.Occupant = card;
                 ctx.Loop.Publish(new AmuletPlacedEvent(Issuer, card.Instance, card.Card, idx), ctx);
             }
@@ -131,22 +143,33 @@ public sealed record PlayCardAction(
         var list = new List<RuntimeCard>();
         if (TargetMinion.HasValue)
         {
-            var t = FindAnywhere(state, TargetMinion.Value);
+            var t = FindTargetForSpec(state, TargetMinion.Value);
             if (t is not null) list.Add(t);
         }
         if (ExtraTargets is not null)
         {
             foreach (var id in ExtraTargets)
             {
-                var t = FindAnywhere(state, id);
+                var t = FindTargetForSpec(state, id);
                 if (t is not null) list.Add(t);
             }
         }
         return list;
     }
 
-    private static RuntimeCard? FindAnywhere(GameState state, InstanceId id)
+    /// <summary>
+    /// Resolve an InstanceId into a RuntimeCard, honoring the card's PlayTarget scope:
+    /// hand for MultipleFromHand, graveyard for SingleAllyGraveyardCard, field for everything else.
+    /// </summary>
+    private RuntimeCard? FindTargetForSpec(GameState state, InstanceId id)
     {
+        // Try own hand first (for MultipleFromHand), then own graveyard (for SingleAllyGraveyardCard),
+        // then field on either side (for minion targets). First hit wins.
+        var me = state.GetPlayer(Issuer);
+        var h = me.Hand.FirstOrDefault(c => c.Instance == id);
+        if (h is not null) return h;
+        var g = me.Graveyard.FirstOrDefault(c => c.Instance == id);
+        if (g is not null) return g;
         foreach (var side in new[] { PlayerSide.First, PlayerSide.Second })
         {
             var t = state.GetPlayer(side).FindOnField(id);
@@ -187,6 +210,24 @@ public sealed record PlayCardAction(
                     throw new InvalidActionException("此法术目标必须是敌方随从");
                 if (script.PlayTarget == TargetSpec.SingleAllyMinion && m.Owner != Issuer)
                     throw new InvalidActionException("此法术目标必须是我方随从");
+                return;
+            case TargetSpec.MultipleFromHand:
+                // 0 selections is legal (per user Q13). If any provided, they must be in own hand.
+                var me = state.GetPlayer(Issuer);
+                if (ExtraTargets is not null)
+                {
+                    foreach (var id in ExtraTargets)
+                    {
+                        if (me.Hand.All(c => c.Instance != id))
+                            throw new InvalidActionException("选中的手牌不存在");
+                    }
+                }
+                return;
+            case TargetSpec.SingleAllyGraveyardCard:
+                if (!TargetMinion.HasValue) throw new InvalidActionException("此效果需要选择一张墓地卡");
+                var gyMe = state.GetPlayer(Issuer);
+                if (gyMe.Graveyard.All(c => c.Instance != TargetMinion.Value))
+                    throw new InvalidActionException("目标不在墓地");
                 return;
             default:
                 return;

@@ -35,16 +35,19 @@ public static class TurnManager
             }
         }
 
-        // Refresh attack permissions for surviving minions.
-        // SummonedThisTurn is cleared FIRST so that a minion played on the previous owner-turn is fully
-        // available now (Hearthstone-style: summoning sickness lasts until your next turn begins).
+        // Refresh attack permissions for surviving minions + tick landmark/amulet activate cooldowns.
         foreach (var tile in p.Field)
         {
             if (tile.Occupant is not RuntimeCard m) continue;
             m.SummonedThisTurn = false;
             m.AttacksThisTurn = 0;
             m.CanAttackThisTurn = true;
+            if (m.Counters.TryGetValue("activate_cd", out int cd) && cd > 0)
+                m.Counters["activate_cd"] = cd - 1;
         }
+        if (p.TerrainSlot.Occupant is { } tocc
+            && tocc.Counters.TryGetValue("activate_cd", out int tcd) && tcd > 0)
+            tocc.Counters["activate_cd"] = tcd - 1;
 
         // Tick amulet countdowns BEFORE draw (GDD §10 step 1).
         TickAmuletsAndTileEffects(ctx, side);
@@ -60,8 +63,15 @@ public static class TurnManager
             ctx.CardDatabase.Get(m.Card).OnOwnerTurnStart(ctx.WithSource(m));
         }
 
-        // Draw phase.
+        // Draw phase. First apply any delayed bonus draws (拖延议程), then the normal 1 draw.
         state.Phase = GamePhase.Draw;
+        if (p.NextTurnBonusDraws > 0)
+        {
+            int bonus = p.NextTurnBonusDraws;
+            p.NextTurnBonusDraws = 0;
+            EffectPrimitives.Draw(ctx, side, bonus);
+            if (ctx.Loop.IsGameOver) return;
+        }
         EffectPrimitives.Draw(ctx, side, 1);
         if (ctx.Loop.IsGameOver) return;
 

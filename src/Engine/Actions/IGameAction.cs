@@ -16,6 +16,7 @@ namespace ShadowCardSmash.Engine;
 [JsonDerivedType(typeof(EvolveAction),   "Evolve")]
 [JsonDerivedType(typeof(EndTurnAction),  "EndTurn")]
 [JsonDerivedType(typeof(MulliganAction), "Mulligan")]
+[JsonDerivedType(typeof(ActivateAction), "Activate")]
 public interface IGameAction
 {
     /// <summary>The side issuing this action.</summary>
