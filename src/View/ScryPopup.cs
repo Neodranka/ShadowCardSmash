@@ -70,9 +70,12 @@ public partial class ScryPopup : Control
         titleLabel.Modulate = new Color(0.95f, 0.9f, 1f);
         vb.AddChild(titleLabel);
 
+        var hintText = topN.Count > 0
+            ? "选择一张作为牌库顶（左至右为原本的顶三张），或选择下方「洗回牌库并从手牌置顶」。"
+            : "牌库为空，无卡可查看。仍可选择「从手牌选一张置牌库顶（回复 1 费）」。";
         var hint = new Label
         {
-            Text = "选择一张作为牌库顶（左至右为原本的顶三张），或选择「洗回牌库并从手牌置顶」。",
+            Text = hintText,
             HorizontalAlignment = HorizontalAlignment.Center,
         };
         hint.AddThemeFontSizeOverride("font_size", 14);
@@ -81,7 +84,7 @@ public partial class ScryPopup : Control
 
         vb.AddChild(new HSeparator());
 
-        // 3-card grid with per-card "选此置顶" button underneath.
+        // 3-card grid with per-card "选此置顶" button underneath. Empty when deck is empty.
         var grid = new HBoxContainer();
         grid.AddThemeConstantOverride("separation", 12);
         grid.Alignment = BoxContainer.AlignmentMode.Center;

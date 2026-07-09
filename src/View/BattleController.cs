@@ -324,7 +324,7 @@ public partial class BattleController : Node
         ResetMode();
         _selectedHandInstance = card.Instance;
         _selectedCardId = card.Card;
-        _selectedSpec = script.PlayTarget;
+        _selectedSpec = script.ResolvePlayTarget(State, LocalSide);
 
         // Landmark = special Amulet: skip tile pick, auto-target TerrainSlot (overwrites existing).
         // Also handle MultipleFromHand landmarks (摄政议会).
@@ -395,13 +395,7 @@ public partial class BattleController : Node
         // Top = last index per Draw convention. Slice top 3 in display order (topmost first).
         var topN = new System.Collections.Generic.List<RuntimeCard>();
         for (int i = deck.Count - 1; i >= 0 && topN.Count < 3; i--) topN.Add(deck[i]);
-        if (topN.Count == 0)
-        {
-            // Empty deck: nothing to scry — cancel gracefully.
-            _board.SetStatus("牌库为空，无法查看");
-            ResetMode();
-            return;
-        }
+        // Empty deck is legal — branch B (shuffle+hand+refund) still works with 0 scry cards.
 
         var popup = new ScryPopup();
         AddChild(popup);
@@ -523,10 +517,13 @@ public partial class BattleController : Node
                         _board.SetStatus($"{script.Name} 不能放在场地槽位");
                         return;
                     }
-                    if (script.PlayTarget != TargetSpec.None && _pendingTileIndex is null)
+                    // Use dynamic ResolvePlayTarget so cards like 阿尔文 can suppress the popup when
+                    // conditions for the "shuffle" branch aren't met (i.e., tutor path with no UI).
+                    var effectiveSpec = script.ResolvePlayTarget(State, LocalSide);
+                    if (effectiveSpec != TargetSpec.None && _pendingTileIndex is null)
                     {
                         // MultipleFromHand → open the hand-multi-select popup instead of tile-based target picking.
-                        if (script.PlayTarget == TargetSpec.MultipleFromHand)
+                        if (effectiveSpec == TargetSpec.MultipleFromHand)
                         {
                             _pendingTileIndex = tileIndex;
                             OpenHandMultiSelectFor(script, _selectedHandInstance);
@@ -534,7 +531,7 @@ public partial class BattleController : Node
                         }
                         // No valid targets on board → skip the target-pick sub-state and play directly.
                         // OnPlay sees PickedTarget=null and exits early (规则：算作未触发开幕).
-                        if (!HasAnyValidTarget(script.PlayTarget))
+                        if (!HasAnyValidTarget(effectiveSpec))
                         {
                             TrySubmit(new PlayCardAction(LocalSide, _selectedHandInstance, tileIndex, null, null));
                             return;

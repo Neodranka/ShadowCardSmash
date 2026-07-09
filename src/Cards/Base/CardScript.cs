@@ -34,6 +34,7 @@ public abstract class CardScript : ICardScript
     public virtual IReadOnlyList<string> Tags => Data?.Tags ?? Array.Empty<string>();
     public virtual TargetSpec PlayTarget => TargetSpec.None;
     public virtual int TargetsToPick => 1;
+    public virtual TargetSpec ResolvePlayTarget(GameState state, PlayerSide side) => PlayTarget;
     public virtual IReadOnlyList<CardChoice> Choices => Array.Empty<CardChoice>();
     public virtual int ChoicesToPick => 1;
     public virtual int EnhanceCost => 0;

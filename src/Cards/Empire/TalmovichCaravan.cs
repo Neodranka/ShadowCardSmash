@@ -8,6 +8,7 @@ namespace ShadowCardSmash.Cards.Empire;
 public sealed class TalmovichCaravan : MinionCard
 {
     public override TargetSpec PlayTarget => TargetSpec.MultipleFromHand;
+    public override int TargetsToPick => int.MaxValue; // "任意张手牌"
 
     public override void OnPlay(GameContext ctx)
     {

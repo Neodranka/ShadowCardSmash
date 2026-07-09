@@ -20,6 +20,7 @@ public sealed class RegencyCouncil : AmuletCard
     public override bool CanActivate => true;
     public override int ActivateCost => 0;
     public override TargetSpec PlayTarget => TargetSpec.MultipleFromHand;
+    public override int TargetsToPick => int.MaxValue; // "任意张手牌"（第 2 张起）；第 1 张时 UI 上限用 min/max=1 由 controller 依据 state 决定
 
     public override void OnPlay(GameContext ctx)
     {

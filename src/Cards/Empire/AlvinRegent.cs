@@ -11,6 +11,18 @@ public sealed class AlvinRegent : MinionCard
 {
     private static readonly CardId RegencyCouncilId = new(3011);
     public override TargetSpec PlayTarget => TargetSpec.MultipleFromHand;
+    public override int TargetsToPick => int.MaxValue; // "任意张手牌"
+
+    /// <summary>Dynamic override: no council on field → PlayTarget=None (auto-tutor, no popup).
+    /// Council on field → MultipleFromHand (open hand-multi-select for the shuffle path).</summary>
+    public override TargetSpec ResolvePlayTarget(GameState state, PlayerSide side)
+    {
+        var p = state.GetPlayer(side);
+        if (p.TerrainSlot.Occupant is { } t && t.Card == RegencyCouncilId) return TargetSpec.MultipleFromHand;
+        foreach (var tile in p.Field)
+            if (tile.Occupant is { } m && m.Card == RegencyCouncilId) return TargetSpec.MultipleFromHand;
+        return TargetSpec.None;
+    }
 
     public override void OnPlay(GameContext ctx)
     {

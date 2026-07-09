@@ -143,14 +143,18 @@ public static class EffectPrimitives
         if (actuallyDrawn > 0) DispatchOwnerCardsDrawnBatch(ctx, side, actuallyDrawn);
     }
 
-    /// <summary>Draw from deck until hand is full. 其余牌库牌不算抽 — 走 MillRestOfDeck 单独处理。</summary>
+    /// <summary>Draw from deck until hand is full. Caps by min(手上空位, 牌库剩余) so an empty deck
+    /// doesn't trip Fatigue (bug where 紧急议案 dealt fatigue while deck still had cards was actually
+    /// the reverse: it drew MORE than the deck had, tripping fatigue for the shortfall).</summary>
     public static int DrawUntilHandFull(GameContext ctx, PlayerSide side)
     {
         var p = ctx.State.GetPlayer(side);
-        int target = PlayerState.HandLimit - p.Hand.Count;
-        if (target <= 0) return 0;
+        int handSpace = PlayerState.HandLimit - p.Hand.Count;
+        if (handSpace <= 0) return 0;
+        int toDraw = System.Math.Min(handSpace, p.Deck.Count);
+        if (toDraw <= 0) return 0;
         int before = p.Hand.Count;
-        Draw(ctx, side, target);
+        Draw(ctx, side, toDraw);
         return p.Hand.Count - before;
     }
 

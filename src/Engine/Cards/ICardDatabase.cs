@@ -28,8 +28,14 @@ public interface ICardScript
     Rarity Rarity { get; }
     IReadOnlyList<string> Tags { get; }
     TargetSpec PlayTarget { get; }
-    /// <summary>How many minion targets the main play action wants when PlayTarget is Single*. Default 1.</summary>
+    /// <summary>How many minion targets the main play action wants when PlayTarget is Single*. Default 1.
+    /// For MultipleFromHand, means the max selectable; 0 or int.MaxValue = unlimited.</summary>
     int TargetsToPick { get; }
+    /// <summary>Optional dynamic override: cards whose target requirement depends on game state
+    /// (e.g., 阿尔文 tutors when no council exists, but needs hand selection when one does).
+    /// Default returns <see cref="PlayTarget"/>. BattleController uses this to route UI decisions;
+    /// PlayCardAction still validates by static PlayTarget (dynamic path just narrows what UI collects).</summary>
+    TargetSpec ResolvePlayTarget(GameState state, PlayerSide side);
     /// <summary>Optional choice menu shown before play resolves. Empty = no choice.</summary>
     IReadOnlyList<CardChoice> Choices { get; }
     /// <summary>How many of <see cref="Choices"/> the player must select. Default 1.</summary>
