@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_card")
 Name = "议会秘书"
-Description = "每当你将一张牌洗入牌库时 +1/+1。"
+Description = "每当你将卡牌洗入牌库时，获得+1/+1。"
 Cost = 2
 BaseAttack = 2
 BaseHealth = 2

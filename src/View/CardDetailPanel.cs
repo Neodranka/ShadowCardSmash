@@ -91,14 +91,17 @@ public partial class CardDetailPanel : PanelContainer
         vb.AddChild(_stats);
     }
 
-    public void ShowFor(RuntimeCard card, ICardScript script, bool onField, bool pin)
+    public void ShowFor(RuntimeCard card, ICardScript script, bool onField, bool pin,
+        string? runtimeExtra = null)
     {
         BuildUi();
         if (IsPinned && !pin) return; // hover preview cannot replace a pinned selection.
 
         _name.Text = script.Name;
         _typeRow.Text = BuildTypeLine(script);
-        _description.Text = string.IsNullOrEmpty(script.Description) ? "(无描述)" : script.Description;
+        var desc = string.IsNullOrEmpty(script.Description) ? "(无描述)" : script.Description;
+        if (!string.IsNullOrEmpty(runtimeExtra)) desc += "\n\n" + runtimeExtra;
+        _description.Text = desc;
         _keywords.Text = BuildKeywordLine(card, script, onField);
         _stats.Text = BuildStatsLine(card, script, onField);
         Visible = true;
@@ -123,7 +126,8 @@ public partial class CardDetailPanel : PanelContainer
         {
             CardType.Minion => "随从",
             CardType.Spell => "法术",
-            CardType.Amulet => "护符",
+            CardType.Amulet => s.IsLandmark ? "地标" : "护符",
+            CardType.Terrain => "场地",
             _ => "?",
         };
         string rarity = s.Rarity switch

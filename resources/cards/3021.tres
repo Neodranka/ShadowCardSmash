@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_card")
 Name = "拖延议程"
-Description = "选择一张手牌洗回牌库，下回合开始时额外抽 2 张。可叠加。"
+Description = "将一张手牌洗入牌库，下回合开始时额外抽取两张卡牌。"
 Cost = 0
 BaseAttack = 0
 BaseHealth = 0

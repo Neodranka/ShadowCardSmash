@@ -23,4 +23,8 @@ public enum TargetSpec
     MultipleFromHand,
     /// <summary>Single card from own graveyard. Used by 阿尔文大公 OnEvolve.</summary>
     SingleAllyGraveyardCard,
+    /// <summary>UI: reveal top 3 of own deck, then choose one to promote to top OR shuffle-and-hand-top.
+    /// Used by 利害权衡. Encoding is in ChoiceIndices[0]=branch (0=promote-one, 1=shuffle+hand)
+    /// + ChoiceIndices[1]=which of the 3 (for branch 0) + ExtraTargets[0]=hand card id (for branch 1).</summary>
+    ScryTop3,
 }

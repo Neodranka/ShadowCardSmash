@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_card")
 Name = "塔尔莫维奇商队"
-Description = "开幕：选择任意张手牌洗回牌库，回复等量费用。"
+Description = "开幕：选择任意张手牌返回牌库，回复等同于返回的卡牌张数的费用。"
 Cost = 3
 BaseAttack = 1
 BaseHealth = 3

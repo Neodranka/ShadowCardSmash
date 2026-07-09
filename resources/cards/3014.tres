@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_card")
 Name = "复议"
-Description = "从墓地随机抽牌直到手牌上限。其余墓地牌全部返回牌库。"
+Description = "从墓地抽牌直到手牌上限。其余的牌全部返回牌库。"
 Cost = 5
 BaseAttack = 0
 BaseHealth = 0

@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_card")
 Name = "征召兵"
-Description = "攻击时获得 +2/+0。"
+Description = "攻击时获得+2/+0。"
 Cost = 1
 BaseAttack = 1
 BaseHealth = 1

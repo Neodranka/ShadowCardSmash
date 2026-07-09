@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_card")
 Name = "利害权衡"
-Description = "抉择：1) 查看牌库顶 3 张，选一张移到牌库顶；2) 选一张手牌置于牌库顶，回复 1 费。"
+Description = "查看我方牌库顶的三张牌，可选择一张移动到牌库顶。或是选择一张手牌置入牌库顶，并恢复1点费用。"
 Cost = 1
 BaseAttack = 0
 BaseHealth = 0

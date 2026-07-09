@@ -397,11 +397,31 @@ public partial class BoardView : Control
             {
                 if (t.Occupant is { } occ && occ.Instance == iid)
                 {
-                    DetailPanel.ShowFor(occ, _lastDb.Get(occ.Card), onField: true, pin: false);
+                    DetailPanel.ShowFor(occ, _lastDb.Get(occ.Card), onField: true, pin: false,
+                        runtimeExtra: BuildRuntimeExtra(occ, p));
                     return;
                 }
             }
+            // Landmarks / terrain live in the dedicated TerrainSlot — must be checked too.
+            if (p.TerrainSlot.Occupant is { } tocc && tocc.Instance == iid)
+            {
+                DetailPanel.ShowFor(tocc, _lastDb.Get(tocc.Card), onField: true, pin: false,
+                    runtimeExtra: BuildRuntimeExtra(tocc, p));
+                return;
+            }
         }
+    }
+
+    /// <summary>Runtime state read-out injected into the detail panel description (e.g., 议案 layers).</summary>
+    private static string? BuildRuntimeExtra(RuntimeCard card, PlayerState owner)
+    {
+        // 摄政议会 (3011): show current 议案 layer count from the owner's shared counter.
+        if (card.Card.Value == 3011)
+        {
+            owner.Counters.TryGetValue("regency", out int layers);
+            return $"当前议案层数：{layers}";
+        }
+        return null;
     }
 
     private InstanceId _pinnedDetailId = InstanceId.None;
@@ -413,9 +433,11 @@ public partial class BoardView : Control
         foreach (var p in _lastState.Players)
         {
             var hc = p.Hand.FirstOrDefault(c => c.Instance == id);
-            if (hc is not null) { DetailPanel.ShowFor(hc, _lastDb.Get(hc.Card), onField: false, pin: true); return; }
+            if (hc is not null) { DetailPanel.ShowFor(hc, _lastDb.Get(hc.Card), onField: false, pin: true,
+                runtimeExtra: BuildRuntimeExtra(hc, p)); return; }
             var fc = p.FindOnFieldOrTerrain(id);
-            if (fc is not null) { DetailPanel.ShowFor(fc, _lastDb.Get(fc.Card), onField: true, pin: true); return; }
+            if (fc is not null) { DetailPanel.ShowFor(fc, _lastDb.Get(fc.Card), onField: true, pin: true,
+                runtimeExtra: BuildRuntimeExtra(fc, p)); return; }
         }
     }
 
@@ -432,9 +454,11 @@ public partial class BoardView : Control
         foreach (var p in _lastState.Players)
         {
             var hc = p.Hand.FirstOrDefault(c => c.Instance == _pinnedDetailId);
-            if (hc is not null) { DetailPanel.ShowFor(hc, _lastDb.Get(hc.Card), onField: false, pin: true); return; }
+            if (hc is not null) { DetailPanel.ShowFor(hc, _lastDb.Get(hc.Card), onField: false, pin: true,
+                runtimeExtra: BuildRuntimeExtra(hc, p)); return; }
             var fc = p.FindOnFieldOrTerrain(_pinnedDetailId);
-            if (fc is not null) { DetailPanel.ShowFor(fc, _lastDb.Get(fc.Card), onField: true, pin: true); return; }
+            if (fc is not null) { DetailPanel.ShowFor(fc, _lastDb.Get(fc.Card), onField: true, pin: true,
+                runtimeExtra: BuildRuntimeExtra(fc, p)); return; }
         }
         // Pinned card is gone (destroyed / removed) → unpin.
         UnpinDetail();

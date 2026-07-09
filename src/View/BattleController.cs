@@ -376,7 +376,60 @@ public partial class BattleController : Node
             return;
         }
 
+        // ScryTop3: open ScryPopup showing top 3 of own deck.
+        if (_selectedSpec == TargetSpec.ScryTop3)
+        {
+            OpenScryPopupFor(script, card.Instance);
+            return;
+        }
+
         BeginSpellTargetPick(script.PlayTarget, script.TargetsToPick, script.Name, card.Instance);
+    }
+
+    private void OpenScryPopupFor(ICardScript script, InstanceId cardInstance)
+    {
+        _mode = Mode.AwaitPlayTarget;
+        _board.PinDetail(cardInstance);
+
+        var deck = State.GetPlayer(LocalSide).Deck;
+        // Top = last index per Draw convention. Slice top 3 in display order (topmost first).
+        var topN = new System.Collections.Generic.List<RuntimeCard>();
+        for (int i = deck.Count - 1; i >= 0 && topN.Count < 3; i--) topN.Add(deck[i]);
+        if (topN.Count == 0)
+        {
+            // Empty deck: nothing to scry — cancel gracefully.
+            _board.SetStatus("牌库为空，无法查看");
+            ResetMode();
+            return;
+        }
+
+        var popup = new ScryPopup();
+        AddChild(popup);
+        popup.Populate($"{script.Name} — 查看牌库顶 {topN.Count} 张", topN, _registry);
+        popup.ChosenPromote += idx =>
+        {
+            // Branch A: reorder — chosen index becomes topmost.
+            _pickedChoices = new[] { 0, idx };
+            SubmitPlayCard();
+        };
+        popup.ChosenShuffleAndPickHand += () =>
+        {
+            // Branch B: chain to a hand-single-select popup (max 1) to pick a hand card, then submit.
+            _pickedChoices = new[] { 1 };
+            var handPopup = new HandMultiSelectPopup();
+            AddChild(handPopup);
+            handPopup.Populate($"{script.Name} — 选择一张手牌置牌库顶",
+                State.GetPlayer(LocalSide).Hand, _registry,
+                minPick: 1, maxPick: 1, excludeInstance: cardInstance);
+            handPopup.Confirmed += ids =>
+            {
+                _pickedTargets.Clear();
+                foreach (var id in ids) _pickedTargets.Add(new InstanceId(id));
+                SubmitPlayCard();
+            };
+            handPopup.Cancelled += () => ResetMode();
+        };
+        popup.Cancelled += () => ResetMode();
     }
 
     private void OpenHandMultiSelectFor(ICardScript script, InstanceId cardInstance)
@@ -897,6 +950,7 @@ public partial class BattleController : Node
             TargetSpec.EmptyEnemyTile       => enemy.Field.Any(t => t.Occupant is null),
             TargetSpec.MultipleFromHand     => true,  // 0 selections is legal — always "valid"
             TargetSpec.SingleAllyGraveyardCard => me.Graveyard.Count > 0,
+            TargetSpec.ScryTop3             => me.Deck.Count > 0,
             // Characters always include heroes — never empty.
             _ => true,
         };

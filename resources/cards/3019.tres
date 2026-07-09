@@ -5,7 +5,8 @@
 [resource]
 script = ExtResource("1_card")
 Name = "塔尔莫维奇财务官"
-Description = "每当你获得额外费用（回复/获得，非回合起始涨费）时 +1/+1。启动 1（冷却 1）：获得 1 点费用（可超过上限）。"
+Description = "每当你获得额外费用，获得+1/+1。
+启动1（冷却1）：获得1点费用。"
 Cost = 3
 BaseAttack = 2
 BaseHealth = 3

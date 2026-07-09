@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_card")
 Name = "会议记录员"
-Description = "每当你（一次）抽卡时获得 +1/+1（按次数，不按张数）。"
+Description = "每当你抽取卡牌时，获得+1/+1。（根据次数而非张数获得）"
 Cost = 2
 BaseAttack = 2
 BaseHealth = 2

@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_card")
 Name = "紧急议案"
-Description = "从牌库抽牌直到手牌上限。其余牌库牌全部进入墓地。"
+Description = "从牌库抽牌直到手牌上限。其余的牌全部进入墓地。"
 Cost = 3
 BaseAttack = 0
 BaseHealth = 0
